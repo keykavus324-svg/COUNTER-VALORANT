@@ -196,8 +196,30 @@ export class GameMap {
       metalness: 0.02,
       normalScale: 1.15,
     });
+    // Height variation: the radar mask gives every block the same extrusion,
+    // which reads as a maze of identical slabs. Blocks near the map edge grow
+    // into buildings, small blocks stay low cover, middling ones vary.
+    const cx = (MAP_BOUNDS.minX + MAP_BOUNDS.maxX) / 2;
+    const cz = (MAP_BOUNDS.minZ + MAP_BOUNDS.maxZ) / 2;
+    const halfSpan = Math.max(
+      (MAP_BOUNDS.maxX - MAP_BOUNDS.minX),
+      (MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ),
+    ) / 2 || 1;
+    // (built into a copy: the baked arrays must stay pristine)
+    const scaledWalls = WALLS.map(([x, z, w, d, h, kind]) => {
+      const dist = Math.hypot(x - cx, z - cz) / halfSpan;   // 0 centre … 1 edge
+      const area = w * d;
+      const seed = (Math.abs((x * 13.7 + z * 7.3) | 0) % 100) / 100;
+      let mul;
+      if (area < 4) mul = 0.55 + seed * 0.25;               // low cover
+      else if (area < 26) mul = 0.85 + seed * 0.5 + dist * 0.25;
+      else mul = 1.15 + seed * 0.7 + dist * 1.15;            // building block
+      return [x, z, w, d, +(Math.min(h * mul, 16)).toFixed(2), kind];
+    });
+    this.wallList = scaledWalls;
+
     const geo = mergedBoxGeometry(
-      WALLS.map(([x, z, w, d, h]) => ({ x, z, w, d, h })),
+      scaledWalls.map(([x, z, w, d, h]) => ({ x, z, w, d, h })),
       { tile: 3.1, topShade: true },
     );
     const mesh = new THREE.Mesh(geo, mat);
@@ -207,7 +229,7 @@ export class GameMap {
     this.group.add(mesh);
     this.wallMesh = mesh;
 
-    WALLS.forEach(([x, z, w, d, h, kind]) => {
+    scaledWalls.forEach(([x, z, w, d, h, kind]) => {
       const box = new THREE.Box3(
         new THREE.Vector3(x - w / 2, 0, z - d / 2),
         new THREE.Vector3(x + w / 2, h, z + d / 2),
@@ -236,8 +258,9 @@ export class GameMap {
   _buildDecor() {
     const { theme } = this;
     const bounds = MAP_BOUNDS;
-    buildWallCaps({ group: this.group, walls: WALLS, theme, themeId: this.themeId, quality: this.quality });
-    buildContactShadows({ group: this.group, walls: WALLS });
+    const walls = this.wallList || WALLS;
+    buildWallCaps({ group: this.group, walls, theme, themeId: this.themeId, quality: this.quality });
+    buildContactShadows({ group: this.group, walls });
     dressGround({
       group: this.group,
       theme,
@@ -249,7 +272,7 @@ export class GameMap {
     });
     dressWalls({
       group: this.group,
-      walls: WALLS,
+      walls,
       isFree: (x, z, r) => this.isFree(x, z, r),
       quality: this.quality,
     });
@@ -257,7 +280,7 @@ export class GameMap {
       group: this.group,
       theme,
       themeId: this.themeId,
-      walls: WALLS,
+      walls,
       isFree: (x, z, r) => this.isFree(x, z, r),
       quality: this.quality,
       onBox: (box, material) => {
@@ -271,7 +294,7 @@ export class GameMap {
     buildHorizon({ group: this.group, bounds, themeId: this.themeId, quality: this.quality });
     const dust = buildDust({ group: this.group, bounds, quality: this.quality, themeId: this.themeId });
     if (dust) { this.dust = dust; this.animated.push({ mesh: dust.points, kind: 'dust' }); }
-    const lamps = buildLampGlows({ group: this.group, walls: WALLS, quality: this.quality });
+    const lamps = buildLampGlows({ group: this.group, walls, quality: this.quality });
     if (lamps.length) this.lamps = lamps;
   }
 

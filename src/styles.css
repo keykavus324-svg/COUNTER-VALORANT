@@ -259,13 +259,13 @@ input[type="checkbox"] { accent-color: var(--red); }
 #hud { position: absolute; inset: 0; z-index: 20; pointer-events: none; font-family: var(--ui); }
 /* colour grade + film grain: static overlays, so the cost is a single composite */
 #grade {
-  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; opacity: .55;
+  position: absolute; inset: 0; pointer-events: none; opacity: .38;
   background:
-    radial-gradient(ellipse at 50% 42%, rgba(255, 214, 160, .10), transparent 62%),
-    linear-gradient(180deg, rgba(28, 44, 66, .20) 0%, transparent 38%, rgba(120, 74, 34, .16) 100%);
+    radial-gradient(ellipse at 50% 38%, rgba(255, 226, 178, .10), transparent 60%),
+    linear-gradient(180deg, rgba(26, 40, 60, .22) 0%, transparent 42%, rgba(104, 66, 30, .20) 100%);
 }
 #hud::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .05;
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .035;
   background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.6) 0 1px, transparent 1px 3px);
   mix-blend-mode: overlay;
 }

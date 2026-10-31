@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GameMap } from '../world/map.js';
+import { PostFX } from './PostFX.js';
 import { Effects } from './effects.js';
 import { Viewmodel } from './Viewmodel.js';
 import { Player } from './player.js';
@@ -134,6 +135,9 @@ export class Game {
     this.camera.rotation.order = 'YXZ';
 
     this.map = new GameMap(this.scene, quality, this.settings.map || 'de_dust2', this.renderer);
+    this.postfx = (!this.headless && this.settings.postfx !== false)
+      ? new PostFX(this.renderer, this.scene, this.camera, quality)
+      : null;
     this.effects = new Effects(this.scene, quality);
     this.viewmodel = new Viewmodel(renderer, quality);
 
@@ -297,6 +301,7 @@ export class Game {
       const w = window.innerWidth || 1280;
       const h = window.innerHeight || 720;
       this.renderer.setSize(w, h);
+      this.postfx?.setSize(w, h, this.renderer.getPixelRatio());
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
     });
@@ -1551,6 +1556,7 @@ export class Game {
     document.exitPointerLock?.();
     audio.stopMusic();
     this.effects?.clearZones();
+    this.postfx?.dispose();
     this.renderer?.dispose();
   }
 
@@ -1796,8 +1802,11 @@ export class Game {
 
   render() {
     const r = this.renderer;
-    r.clear();
-    r.render(this.scene, this.camera);
+    const post = this.postfx;
+    if (!post || !post.render(this.lastDt || 1 / 60)) {
+      r.clear();
+      r.render(this.scene, this.camera);
+    }
     if (this.player.alive && !this.player.scoped && !this.matchOver) {
       this.viewmodel.update(this.lastDt || 1 / 60, this.player.viewmodelState());
       this.viewmodel.render(r, this.camera.aspect);

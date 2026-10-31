@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS = {
   volume: 0.7,
   music: 0.35,
   quality: 'medium',
+  postfx: true,
   chColor: '#5dff9a',
   chDotColor: '#ffffff',
   chGap: 6,
@@ -301,6 +302,7 @@ export class UI {
     set('#set-vol', s.volume); out('#out-vol', s.volume.toFixed(2));
     set('#set-music', s.music); out('#out-music', s.music.toFixed(2));
     set('#set-quality', s.quality);
+    $('#set-postfx').checked = s.postfx !== false;
     set('#set-bots', s.botDifficulty || 'normal');
     set('#set-ch-color', s.chColor);
     set('#set-dot-color', s.chDotColor);
@@ -341,6 +343,11 @@ export class UI {
       this.save();
       this.toast(`Bot zorluğu: ${e.target.selectedOptions[0]?.textContent || s.botDifficulty}`, 2.2);
     });
+    $('#set-postfx').addEventListener('change', (e) => {
+      s.postfx = e.target.checked;
+      this.save();
+      if (this.game) this.toast('Efekt ayarı bir sonraki maçta uygulanacak', 2.4);
+    });
     $('#set-quality').addEventListener('change', (e) => {
       s.quality = e.target.value;
       this.save();
@@ -376,6 +383,8 @@ export class UI {
     set('#set-vol', this.settings.volume); out('#out-vol', this.settings.volume.toFixed(2));
     set('#set-music', this.settings.music); out('#out-music', this.settings.music.toFixed(2));
     set('#set-quality', this.settings.quality);
+    const pfx = $('#set-postfx');
+    if (pfx) pfx.checked = this.settings.postfx !== false;
     set('#set-bots', this.settings.botDifficulty || 'normal');
     set('#set-ch-color', this.settings.chColor);
     set('#set-dot-color', this.settings.chDotColor);
