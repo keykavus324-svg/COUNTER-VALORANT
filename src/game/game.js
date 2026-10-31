@@ -133,7 +133,7 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(this.settings.fov || 90, aspect, 0.05, 420);
     this.camera.rotation.order = 'YXZ';
 
-    this.map = new GameMap(this.scene, quality, this.settings.map || 'de_dust2');
+    this.map = new GameMap(this.scene, quality, this.settings.map || 'de_dust2', this.renderer);
     this.effects = new Effects(this.scene, quality);
     this.viewmodel = new Viewmodel(renderer, quality);
 

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { buildWeaponModel, getWeapon } from './weapons.js';
 import { AGENTS } from './agents.js';
-import { glowTexture } from '../world/Textures.js';
+import { glowTexture, studioEnvTexture } from '../world/Textures.js';
 import { clamp, damp } from '../core/utils.js';
 
 /**
@@ -46,6 +46,20 @@ export class Viewmodel {
     this.flash.position.set(0.24, -0.2, -1.1);
     this.scene.add(this.flash);
     this.flashTime = 0;
+
+    // pre-filtered studio env: the single biggest upgrade for weapon materials
+    try {
+      const envTex = studioEnvTexture();
+      if (envTex && renderer && renderer.isWebGLRenderer && THREE.PMREMGenerator) {
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        pmrem.compileEquirectangularShader();
+        this.scene.environment = pmrem.fromEquirectangular(envTex).texture;
+        this.scene.environmentIntensity = 0.85;
+        pmrem.dispose();
+      }
+    } catch (err) {
+      console.warn('viewmodel env skipped', err?.message || err);
+    }
 
     this.bobPhase = 0;
     this.swayX = 0;

@@ -5,7 +5,12 @@ import {
 } from './mapLayout.js';
 import {
   wallPanel, sandGround, crateTexture, siteDecalTexture, skyTexture, glowTexture,
+  normalMapFrom,
 } from './Textures.js';
+import {
+  mergedBoxGeometry, surfaceMaterial, scatterClutter, dressWalls, dressGround,
+  buildWallCaps, buildHorizon, buildDust, buildLampGlows, buildContactShadows,
+} from './Decor.js';
 import { boxFromCenter, segmentBox2D } from '../core/utils.js';
 
 const _rayDir = new THREE.Vector3();
@@ -22,11 +27,12 @@ function cached(key, make) {
 
 /* ------------------------------------------------------------------ */
 export class GameMap {
-  constructor(scene, quality = 'medium', mapId = null) {
+  constructor(scene, quality = 'medium', mapId = null, renderer = null) {
     const id = mapId || CURRENT_MAP.id;
     applyMap(id);
 
     this.scene = scene;
+    this.renderer = renderer;
     this.mapId = id;
     this.map = MAP_BY_ID[id] || CURRENT_MAP;
     this.themeId = this.map.theme;
@@ -51,6 +57,7 @@ export class GameMap {
     this._buildGround();
     this._buildWalls();
     this._buildProps();
+    this._buildDecor();
     this._buildSiteMarkers();
     this._buildSpawnMarkers();
     this._buildNav();
@@ -66,11 +73,12 @@ export class GameMap {
   /* ---------------------------------------------------------------- */
   _buildLights() {
     const { theme, scene } = this;
-    const hemi = new THREE.HemisphereLight(theme.hemi[0], theme.hemi[1], 1.0);
+    // sky dome light + a whisper of ambient keeps shadows from going pure black
+    const hemi = new THREE.HemisphereLight(theme.hemi[0], theme.hemi[1], 0.85);
     scene.add(hemi);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.26));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.14));
 
-    const sun = new THREE.DirectionalLight(theme.sun, 2.5);
+    const sun = new THREE.DirectionalLight(theme.sun, 2.35);
     sun.position.set(52, 66, 38);
     sun.target.position.set(0, 0, 0);
     scene.add(sun.target);
@@ -79,12 +87,11 @@ export class GameMap {
       const size = this.quality === 'high' ? 2048 : 1024;
       sun.shadow.mapSize.set(size, size);
       const cam = sun.shadow.camera;
-      const span = Math.max(
-        MAP_BOUNDS.maxX - MAP_BOUNDS.minX,
-        MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ,
-      ) * 0.55;
+      // a tight frustum that follows the player gives ~10x the shadow detail
+      // of the old map-wide one, for the same fill rate
+      const span = this.quality === 'high' ? 34 : 26;
       cam.left = -span; cam.right = span; cam.top = span; cam.bottom = -span;
-      cam.near = 1; cam.far = span * 4;
+      cam.near = 1; cam.far = 190;
       sun.shadow.bias = -0.0007;
       sun.shadow.normalBias = 0.04;
       sun.shadow.camera.updateProjectionMatrix();
@@ -92,7 +99,38 @@ export class GameMap {
     this.sun = sun;
     scene.add(sun);
 
-    scene.fog = new THREE.FogExp2(_c.set(theme.sky[1]).getHex(), 0.0065);
+    // cool bounce light from the opposite side: separates perpendicular walls
+    const fill = new THREE.DirectionalLight(0xbcd2e8, 0.5);
+    fill.position.set(-60, 34, -48);
+    scene.add(fill);
+    this.fill = fill;
+
+    scene.fog = new THREE.FogExp2(_c.set(theme.sky[2]).getHex(), 0.0042);
+
+    this._buildEnvironment();
+  }
+
+  /**
+   * Pre-filter the sky dome into an environment map: the only way PBR metal
+   * (barrels, weapons, scopes) picks up real colour instead of flat grey.
+   */
+  _buildEnvironment() {
+    const renderer = this.renderer;
+    if (!renderer || !renderer.isWebGLRenderer || typeof THREE.PMREMGenerator !== 'function') return;
+    try {
+      const tex = skyTexture(this.theme.sky);
+      if (!tex) return;
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      pmrem.compileEquirectangularShader();
+      const env = pmrem.fromEquirectangular(tex).texture;
+      this.scene.environment = env;
+      this.scene.environmentIntensity = 0.55;
+      pmrem.dispose();
+      this.envMap = env;
+    } catch (err) {
+      console.warn('environment map skipped', err?.message || err);
+    }
   }
 
   _buildSky() {
@@ -123,6 +161,13 @@ export class GameMap {
       if (tex) {
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
         tex.repeat.set(w / 8, d / 8);
+        const nrm = normalMapFrom(tex.image, 1.5, 256);
+        if (nrm) {
+          nrm.wrapS = nrm.wrapT = THREE.RepeatWrapping;
+          nrm.repeat.set(w / 8, d / 8);
+          m.normalMap = nrm;
+          m.normalScale.set(0.65, 0.65);
+        }
       }
       return m;
     });
@@ -138,35 +183,31 @@ export class GameMap {
   _buildWalls() {
     if (!WALLS.length) return;
     const { theme } = this;
-    const tex = wallPanel(`#${theme.wall.toString(16)}`, `#${theme.wallDark.toString(16)}`, 7);
-    if (tex) {
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(3, 2);
-    }
-    const mat = cached(`wall-${this.themeId}`, () => new THREE.MeshStandardMaterial({
-      map: tex || null,
-      color: tex ? 0xffffff : theme.wall,
-      roughness: 0.93,
+    const tex = wallPanel(
+      `#${theme.wall.toString(16).padStart(6, '0')}`,
+      `#${theme.wallDark.toString(16).padStart(6, '0')}`,
+      7,
+    );
+    // One merged mesh, but every face keeps a constant texel density (tile in
+    // metres) instead of the old "same stretch on a 2 m and a 40 m wall".
+    const mat = surfaceMaterial(tex, {
+      key: `wall-${this.themeId}`,
+      roughness: 0.94,
       metalness: 0.02,
-    }));
-
-    const geo = new THREE.BoxGeometry(1, 1, 1);
-    const mesh = new THREE.InstancedMesh(geo, mat, WALLS.length);
+      normalScale: 1.15,
+    });
+    const geo = mergedBoxGeometry(
+      WALLS.map(([x, z, w, d, h]) => ({ x, z, w, d, h })),
+      { tile: 3.1, topShade: true },
+    );
+    const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = this.quality !== 'low';
     mesh.receiveShadow = true;
     mesh.name = 'walls';
+    this.group.add(mesh);
+    this.wallMesh = mesh;
 
-    const m = new THREE.Matrix4();
-    const pos = new THREE.Vector3();
-    const scl = new THREE.Vector3();
-    const quat = new THREE.Quaternion();
-
-    WALLS.forEach(([x, z, w, d, h, kind], i) => {
-      pos.set(x, h / 2, z);
-      scl.set(w, h, d);
-      m.compose(pos, quat, scl);
-      mesh.setMatrixAt(i, m);
-
+    WALLS.forEach(([x, z, w, d, h, kind]) => {
       const box = new THREE.Box3(
         new THREE.Vector3(x - w / 2, 0, z - d / 2),
         new THREE.Vector3(x + w / 2, h, z + d / 2),
@@ -176,33 +217,83 @@ export class GameMap {
       this.navBlockers.push(box);
       if (h > 0.95) this.sightBlockers.push(box);
     });
-    mesh.instanceMatrix.needsUpdate = true;
-    this.group.add(mesh);
-    this.wallMesh = mesh;
+  }
+
+  /** true when a circle of radius r at (x,z) is clear of every solid box */
+  isFree(x, z, r = 0.4) {
+    if (x < MAP_BOUNDS.minX + r || x > MAP_BOUNDS.maxX - r) return false;
+    if (z < MAP_BOUNDS.minZ + r || z > MAP_BOUNDS.maxZ - r) return false;
+    for (const b of this.boxes) {
+      if (x > b.min.x - r && x < b.max.x + r && z > b.min.z - r && z < b.max.z + r) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Static art pass: wall caps, posters, clutter, ground paint, skyline, dust.
+   * Runs after the collision geometry so every prop can test against it.
+   */
+  _buildDecor() {
+    const { theme } = this;
+    const bounds = MAP_BOUNDS;
+    buildWallCaps({ group: this.group, walls: WALLS, theme, themeId: this.themeId, quality: this.quality });
+    buildContactShadows({ group: this.group, walls: WALLS });
+    dressGround({
+      group: this.group,
+      theme,
+      themeId: this.themeId,
+      themeKind: this.themeId,
+      bounds,
+      sites: SITES,
+      quality: this.quality,
+    });
+    dressWalls({
+      group: this.group,
+      walls: WALLS,
+      isFree: (x, z, r) => this.isFree(x, z, r),
+      quality: this.quality,
+    });
+    const clutter = scatterClutter({
+      group: this.group,
+      theme,
+      themeId: this.themeId,
+      walls: WALLS,
+      isFree: (x, z, r) => this.isFree(x, z, r),
+      quality: this.quality,
+      onBox: (box, material) => {
+        this.boxes.push(box);
+        this.bulletBoxes.push({ box, material });
+        this.navBlockers.push(box);
+        if (box.max.y > 0.95) this.sightBlockers.push(box);
+      },
+    });
+    this.clutter = clutter;
+    buildHorizon({ group: this.group, bounds, themeId: this.themeId, quality: this.quality });
+    const dust = buildDust({ group: this.group, bounds, quality: this.quality, themeId: this.themeId });
+    if (dust) { this.dust = dust; this.animated.push({ mesh: dust.points, kind: 'dust' }); }
+    const lamps = buildLampGlows({ group: this.group, walls: WALLS, quality: this.quality });
+    if (lamps.length) this.lamps = lamps;
   }
 
   _buildProps() {
     if (!PROPS.length) return;
     const tex = crateTexture(11, `#${this.theme.crate.toString(16)}`);
-    const mat = cached(`crate-${this.themeId}`, () => new THREE.MeshStandardMaterial({
-      map: tex || null,
-      color: tex ? 0xffffff : this.theme.crate,
+    const mat = surfaceMaterial(tex, {
+      key: `crate-${this.themeId}`,
       roughness: 0.88,
-    }));
-    const geo = new THREE.BoxGeometry(1, 1, 1);
-    const mesh = new THREE.InstancedMesh(geo, mat, PROPS.length);
+      normalScale: 1.0,
+    });
+    const geo = mergedBoxGeometry(
+      PROPS.map(([x, z, w, d, h]) => ({ x, z, w, d, h })),
+      { tile: 1.1 },
+    );
+    const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    const m = new THREE.Matrix4();
-    const pos = new THREE.Vector3();
-    const scl = new THREE.Vector3();
-    const quat = new THREE.Quaternion();
+    mesh.name = 'props';
+    this.group.add(mesh);
 
-    PROPS.forEach(([x, z, w, d, h, type], i) => {
-      pos.set(x, h / 2, z);
-      scl.set(w, h, d);
-      m.compose(pos, quat, scl);
-      mesh.setMatrixAt(i, m);
+    PROPS.forEach(([x, z, w, d, h, type]) => {
       const box = new THREE.Box3(
         new THREE.Vector3(x - w / 2, 0, z - d / 2),
         new THREE.Vector3(x + w / 2, h, z + d / 2),
@@ -212,8 +303,6 @@ export class GameMap {
       this.navBlockers.push(box);
       if (h > 0.95) this.sightBlockers.push(box);
     });
-    mesh.instanceMatrix.needsUpdate = true;
-    this.group.add(mesh);
   }
 
   _buildSiteMarkers() {
@@ -364,11 +453,33 @@ export class GameMap {
     return null;
   }
 
-  update(dt) {
+  update(dt, camera) {
     this.time += dt;
+    if (camera?.position) {
+      this._focus = { x: camera.position.x, z: camera.position.z };
+    }
+    // keep the sun rig centred on the action so shadows stay sharp
+    const focus = this._focus;
+    if (this.sun && focus && this.sun.castShadow) {
+      const dirX = 52, dirY = 66, dirZ = 38;
+      const len = Math.hypot(dirX, dirY, dirZ) || 1;
+      const dist = 90;
+      this.sun.position.set(
+        focus.x + (dirX / len) * dist,
+        (dirY / len) * dist,
+        focus.z + (dirZ / len) * dist,
+      );
+      this.sun.target.position.set(focus.x, 0, focus.z);
+      this.sun.target.updateMatrixWorld();
+    }
+
     for (const a of this.animated) {
       if (a.kind === 'siteBeam') {
         a.mesh.material.opacity = 0.07 + Math.sin(this.time * 1.4) * 0.03;
+      } else if (a.kind === 'dust') {
+        // lazy drift: rotate the cloud and bob it, no per-particle cost
+        a.mesh.rotation.y = this.time * 0.012;
+        a.mesh.position.y = Math.sin(this.time * 0.35) * 0.25;
       }
     }
     if (this.sky) this.sky.position.copy(this.scene.getObjectByName('camera')?.position || this.sky.position);

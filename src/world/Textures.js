@@ -463,3 +463,383 @@ export function disposeTextureCache() {
   for (const t of cache.values()) t.dispose();
   cache.clear();
 }
+
+/* ================================================================== */
+/* PBR helpers — normal maps, roughness, grunge overlays               */
+/* ================================================================== */
+
+/**
+ * Derive a tangent-space normal map from the luminance of a canvas.
+ * Every material in the game gets one, which is the single biggest
+ * difference between "flat painted box" and "wall you can read the
+ * surface of". Sobel on the alpha/luma, wrapped at the edges.
+ */
+export function normalMapFrom(canvas, strength = 2.4, size = 256) {
+  const key = `nrm-${canvas.__cvKey || 'anon'}-${strength}-${size}`;
+  if (cache.has(key)) return cache.get(key);
+  let src;
+  try {
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(canvas, 0, 0, size, size);
+    src = ctx.getImageData(0, 0, size, size).data;
+  } catch {
+    return null;
+  }
+  const lum = new Float32Array(size * size);
+  for (let i = 0; i < size * size; i++) {
+    const j = i * 4;
+    lum[i] = (src[j] * 0.299 + src[j + 1] * 0.587 + src[j + 2] * 0.114) / 255;
+  }
+  const out = new Uint8Array(size * size * 4);
+  const at = (x, y) => lum[((y + size) % size) * size + ((x + size) % size)];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const tl = at(x - 1, y - 1), t = at(x, y - 1), tr = at(x + 1, y - 1);
+      const l = at(x - 1, y), r = at(x + 1, y);
+      const bl = at(x - 1, y + 1), b = at(x, y + 1), br = at(x + 1, y + 1);
+      const dx = (tr + 2 * r + br) - (tl + 2 * l + bl);
+      const dy = (bl + 2 * b + br) - (tl + 2 * t + tr);
+      let nx = -dx * strength;
+      let ny = -dy * strength;
+      let nz = 1;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      nx /= len; ny /= len; nz /= len;
+      const i = (y * size + x) * 4;
+      out[i] = (nx * 0.5 + 0.5) * 255;
+      out[i + 1] = (ny * 0.5 + 0.5) * 255;
+      out[i + 2] = (nz * 0.5 + 0.5) * 255;
+      out[i + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(out, size, size, THREE.RGBAFormat);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  cache.set(key, tex);
+  return tex;
+}
+
+/** Cache key helper so normalMapFrom can memoise per source canvas. */
+export function tagTexture(tex, key) {
+  if (tex && tex.image) tex.image.__cvKey = key;
+  return tex;
+}
+
+/** Ground splash: broad dirt / sand drifts that break up the flat plane. */
+export function groundSplat(seed = 3) {
+  const key = `splat-${seed}`;
+  if (cache.has(key)) return cache.get(key);
+  const size = 1024;
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d');
+  const rng = seededRandom(seed);
+  ctx.clearRect(0, 0, size, size);
+  for (let i = 0; i < 220; i++) {
+    const x = rng() * size;
+    const y = rng() * size;
+    const rx = 30 + rng() * 190;
+    const ry = rx * (0.35 + rng() * 0.9);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+    const dark = rng() > 0.42;
+    g.addColorStop(0, dark ? `rgba(28,24,18,${0.10 + rng() * 0.16})` : `rgba(226,214,186,${0.08 + rng() * 0.14})`);
+    g.addColorStop(0.65, dark ? 'rgba(28,24,18,.05)' : 'rgba(226,214,186,.04)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rng() * Math.PI);
+    ctx.scale(1, ry / rx);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, rx, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // hairline cracks
+  ctx.strokeStyle = 'rgba(24,20,16,.22)';
+  for (let i = 0; i < 26; i++) {
+    let x = rng() * size;
+    let y = rng() * size;
+    ctx.lineWidth = 0.6 + rng() * 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 14; s++) {
+      x += (rng() - 0.5) * 60;
+      y += (rng() - 0.5) * 60;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  cache.set(key, t);
+  return t;
+}
+
+/** Stencilled markings: arrows, numbers, hazard paint on the concrete. */
+export function stencilTexture(kind = 'arrow', color = '#e2b33c') {
+  const key = `stencil-${kind}-${color}`;
+  if (cache.has(key)) return cache.get(key);
+  const size = 256;
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, size, size);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineCap = 'round';
+  if (kind === 'arrow') {
+    ctx.lineWidth = 26;
+    ctx.beginPath();
+    ctx.moveTo(size * 0.5, size * 0.82);
+    ctx.lineTo(size * 0.5, size * 0.26);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(size * 0.24, size * 0.44);
+    ctx.lineTo(size * 0.5, size * 0.16);
+    ctx.lineTo(size * 0.76, size * 0.44);
+    ctx.stroke();
+  } else if (kind === 'hazard') {
+    for (let i = -size; i < size; i += 46) {
+      ctx.beginPath();
+      ctx.moveTo(i, size);
+      ctx.lineTo(i + 24, size);
+      ctx.lineTo(i + 24 + size * 0.5, 0);
+      ctx.lineTo(i + size * 0.5, 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (kind === 'ring') {
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size * 0.36, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size * 0.44, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    ctx.font = 'bold 190px Impact, Arial Black, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(kind, size / 2, size / 2 + 8);
+  }
+  // weathered: punch holes through the paint
+  ctx.globalCompositeOperation = 'destination-out';
+  const rng = seededRandom(kind.length * 31 + 7);
+  for (let i = 0; i < 90; i++) {
+    ctx.globalAlpha = 0.25 + rng() * 0.6;
+    ctx.beginPath();
+    ctx.arc(rng() * size, rng() * size, 1 + rng() * 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  cache.set(key, t);
+  return t;
+}
+
+/** Wall art: torn posters, graffiti tags and vents stuck on the panels. */
+export function wallDecal(kind = 'poster', seed = 1) {
+  const key = `decal-${kind}-${seed}`;
+  if (cache.has(key)) return cache.get(key);
+  const w = 256;
+  const h = kind === 'poster' ? 320 : 256;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  const rng = seededRandom(seed * 17 + kind.length);
+  ctx.clearRect(0, 0, w, h);
+  if (kind === 'poster') {
+    ctx.fillStyle = `hsl(${Math.floor(rng() * 360)}, 42%, 46%)`;
+    ctx.fillRect(10, 10, w - 20, h - 20);
+    ctx.fillStyle = 'rgba(0,0,0,.5)';
+    ctx.fillRect(10, 10, w - 20, 46);
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = 'bold 30px Arial';
+    ctx.fillText(['DANGER', 'KEEP OUT', 'SECTOR 7', 'NO ENTRY', 'RESTRICTED'][Math.floor(rng() * 5)], 22, 44);
+    ctx.fillStyle = 'rgba(255,255,255,.7)';
+    for (let i = 0; i < 5; i++) ctx.fillRect(22, 80 + i * 16, (w - 60) * (0.4 + rng() * 0.6), 6);
+    // tears
+    ctx.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 22; i++) {
+      ctx.beginPath();
+      ctx.ellipse(rng() * w, rng() * h, 2 + rng() * 9, 2 + rng() * 6, rng() * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  } else if (kind === 'graffiti') {
+    ctx.strokeStyle = `hsla(${Math.floor(rng() * 360)}, 70%, 60%, .85)`;
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(22, h * 0.7);
+    for (let x = 22; x < w - 22; x += 12) {
+      ctx.lineTo(x, h * 0.5 + Math.sin(x * 0.09 + seed) * 34 + (rng() - 0.5) * 10);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = `hsla(${Math.floor(rng() * 360)}, 80%, 68%, .7)`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(30, h * 0.35);
+    ctx.bezierCurveTo(w * 0.4, h * 0.1, w * 0.6, h * 0.6, w - 30, h * 0.3);
+    ctx.stroke();
+  } else if (kind === 'vent') {
+    ctx.fillStyle = '#4a5157';
+    ctx.fillRect(24, 60, w - 48, h - 120);
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    for (let y = 72; y < h - 72; y += 12) ctx.fillRect(36, y, w - 72, 5);
+    ctx.strokeStyle = 'rgba(255,255,255,.18)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(24, 60, w - 48, h - 120);
+  } else if (kind === 'stain') {
+    const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(26,22,16,.55)');
+    g.addColorStop(0.6, 'rgba(30,26,20,.22)');
+    g.addColorStop(1, 'rgba(30,26,20,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  cache.set(key, t);
+  return t;
+}
+
+/** Distant skyline ring so the world does not end at an empty horizon. */
+export function horizonTexture(theme = 'sand') {
+  const key = `horizon-${theme}`;
+  if (cache.has(key)) return cache.get(key);
+  const w = 2048;
+  const h = 256;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  const rng = seededRandom(theme.length * 97 + 13);
+  ctx.clearRect(0, 0, w, h);
+  const palette = {
+    sand: ['#9d8b6d', '#b7a281', '#7d6e55'],
+    terracotta: ['#8d6350', '#a8785f', '#6b4638'],
+    industrial: ['#6a7178', '#828b92', '#4d545a'],
+    jungle: ['#5f6f52', '#768862', '#45523c'],
+    concrete: ['#7b8288', '#8f979d', '#5c6367'],
+    sanctuary: ['#a89a72', '#c0b18a', '#877a58'],
+  }[theme] || ['#9d8b6d', '#b7a281', '#7d6e55'];
+
+  // two layers of buildings for parallax depth
+  for (let layer = 0; layer < 2; layer++) {
+    const baseY = h - (layer === 0 ? 0 : 26);
+    ctx.fillStyle = layer === 0 ? palette[2] : palette[0];
+    ctx.globalAlpha = layer === 0 ? 0.85 : 1;
+    let x = 0;
+    while (x < w) {
+      const bw = 24 + rng() * 90;
+      const bh = (layer === 0 ? 40 : 62) + rng() * (layer === 0 ? 70 : 110);
+      ctx.fillRect(x, baseY - bh, bw, bh);
+      // windows
+      ctx.fillStyle = `rgba(255,226,170,${0.05 + rng() * 0.12})`;
+      for (let wy = baseY - bh + 10; wy < baseY - 8; wy += 14) {
+        for (let wx = x + 6; wx < x + bw - 6; wx += 12) {
+          if (rng() > 0.55) ctx.fillRect(wx, wy, 5, 7);
+        }
+      }
+      ctx.fillStyle = layer === 0 ? palette[2] : palette[0];
+      x += bw + rng() * 26;
+    }
+  }
+  ctx.globalAlpha = 1;
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  t.anisotropy = 4;
+  cache.set(key, t);
+  return t;
+}
+
+/** Painted wooden board / pallet texture for the clutter props. */
+export function palletTexture(base = '#8a6a45', seed = 23) {
+  const key = `pallet-${base}-${seed}`;
+  if (cache.has(key)) return cache.get(key);
+  const size = 256;
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d');
+  const rng = seededRandom(seed);
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 5; i++) {
+    const y = (i * size) / 5;
+    ctx.fillStyle = `rgba(${120 + rng() * 50},${88 + rng() * 40},${52 + rng() * 30},.85)`;
+    ctx.fillRect(0, y + 3, size, size / 5 - 6);
+    ctx.strokeStyle = 'rgba(0,0,0,.28)';
+    ctx.strokeRect(0, y + 3, size, size / 5 - 6);
+    // grain
+    ctx.strokeStyle = 'rgba(60,40,24,.18)';
+    ctx.lineWidth = 1;
+    for (let k = 0; k < 9; k++) {
+      const gy = y + 6 + rng() * (size / 5 - 12);
+      ctx.beginPath();
+      ctx.moveTo(0, gy);
+      ctx.bezierCurveTo(size * 0.3, gy + 2, size * 0.6, gy - 2, size, gy + 1);
+      ctx.stroke();
+    }
+  }
+  grain(ctx, size, rng, 0.07);
+  const t = toTexture(c, 1);
+  cache.set(key, t);
+  return t;
+}
+
+/**
+ * Tiny "photo studio" equirect for the first-person weapon rig: dark floor,
+ * bright sky, two softboxes. Pre-filtered with PMREM it gives metal and painted
+ * guns proper specular streaks instead of the old flat grey sheen.
+ */
+export function studioEnvTexture() {
+  if (cache.has('studio')) return cache.get('studio');
+  const w = 512;
+  const h = 256;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#8fa6bd');
+  g.addColorStop(0.45, '#6d7f92');
+  g.addColorStop(0.55, '#2a2f36');
+  g.addColorStop(1, '#14171a');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  // softboxes
+  const soft = (x, y, r, alpha, color) => {
+    const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, `rgba(${color},${alpha})`);
+    rg.addColorStop(1, `rgba(${color},0)`);
+    ctx.fillStyle = rg;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  };
+  soft(w * 0.28, h * 0.3, 110, 0.95, '255,248,236');
+  soft(w * 0.74, h * 0.36, 78, 0.7, '210,228,255');
+  soft(w * 0.5, h * 0.14, 150, 0.5, '255,255,255');
+  const t = new THREE.CanvasTexture(c);
+  t.mapping = THREE.EquirectangularReflectionMapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  cache.set('studio', t);
+  return t;
+}

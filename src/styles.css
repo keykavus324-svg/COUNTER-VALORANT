@@ -257,7 +257,19 @@ input[type="checkbox"] { accent-color: var(--red); }
    HUD
    ------------------------------------------------------------ */
 #hud { position: absolute; inset: 0; z-index: 20; pointer-events: none; font-family: var(--ui); }
-#vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%); }
+/* colour grade + film grain: static overlays, so the cost is a single composite */
+#grade {
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: overlay; opacity: .55;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(255, 214, 160, .10), transparent 62%),
+    linear-gradient(180deg, rgba(28, 44, 66, .20) 0%, transparent 38%, rgba(120, 74, 34, .16) 100%);
+}
+#hud::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .05;
+  background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.6) 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay;
+}
+#vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,.62) 100%); }
 #damage-vignette { position: absolute; inset: 0; opacity: 0; transition: opacity .22s;
   background: radial-gradient(ellipse at center, transparent 40%, rgba(160, 8, 18, .78) 100%); }
 #flash-overlay { position: absolute; inset: 0; opacity: 0; background: #fff; transition: opacity .1s; }
