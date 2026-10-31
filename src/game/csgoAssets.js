@@ -17,6 +17,8 @@ export const MAP_ART = MAPS.map((m) => ({
   id: m.id,
   name: m.name,
   desc: m.theme.toUpperCase(),
+  kind: m.kind || 'defuse',
+  mode: m.kind === 'hostage' ? 'REHİNE' : 'BOMBA',
   radar: m.radar,
   sites: m.sites,
 }));

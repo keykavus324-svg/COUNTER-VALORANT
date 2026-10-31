@@ -14,9 +14,11 @@ export default defineConfig({
     chunkSizeWarningLimit: 3000,
     rollupOptions: {
       output: {
-        // keep the baked map data in its own chunk so the app shell loads first
+        // Baked map tables must stay in per-map chunks: each arena is a dynamic
+        // import, so returning undefined here keeps Rollup's own code splitting
+        // (grouping all of them under one name would load every map at boot).
         manualChunks(id) {
-          if (id.includes('/src/data/maps/')) return 'maps';
+          if (id.includes('/src/data/maps/')) return undefined;
           if (id.includes('/src/data/')) return 'gamedata';
           if (id.includes('node_modules/three')) return 'three';
           return undefined;

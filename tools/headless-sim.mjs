@@ -84,10 +84,14 @@ let errors = 0;
 const origError = console.error;
 console.error = (...args) => { errors++; origError('[runtime]', ...args); };
 
+const { ensureMap } = await import('../src/world/mapLayout.js');
+const SIM_MAP = process.env.SIM_MAP || 'de_dust2';
+await ensureMap(SIM_MAP);
+
 const game = new Game({
   canvas: makeCanvas(1280, 720),
   ui,
-  settings: { quality: 'low', sens: 0.45, fov: 90, music: 0, volume: 0 },
+  settings: { quality: 'low', sens: 0.45, fov: 90, music: 0, volume: 0, map: SIM_MAP },
   agentId: process.argv[3] || 'blaze',
   headless: true,
   onExit: noop,

@@ -26,8 +26,11 @@ globalThis.document = {
 };
 
 const { Game } = await import('../src/game/game.js');
+const { ensureMap } = await import('../src/world/mapLayout.js');
+const CHECK_MAP = process.argv[2] || 'de_dust2';
+await ensureMap(CHECK_MAP);
 const ui = new Proxy({}, { get: () => () => {} });
-const game = new Game({ canvas: makeCanvas(), ui, settings: { quality: 'medium' }, agentId: 'blaze', headless: true }).init();
+const game = new Game({ canvas: makeCanvas(), ui, settings: { quality: 'medium', map: CHECK_MAP }, agentId: 'blaze', headless: true }).init();
 
 const problems = [];
 let meshes = 0;

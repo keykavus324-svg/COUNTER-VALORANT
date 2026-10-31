@@ -10,7 +10,7 @@
  * bots, UI, radar) always reads the currently selected arena.
  */
 import { decodeMask, buildWalls, buildNav, buildSpots, WALL_HEIGHT } from './gridLayout.js';
-import { bakedMap } from '../data/maps/index.js';
+import { bakedMap, loadBakedMap, preloadBakedMap } from '../data/maps/index.js';
 
 import de_dust2 from './maps/de_dust2.js';
 import de_mirage from './maps/de_mirage.js';
@@ -20,12 +20,27 @@ import de_ancient from './maps/de_ancient.js';
 import de_anubis from './maps/de_anubis.js';
 import de_vertigo from './maps/de_vertigo.js';
 import de_train from './maps/de_train.js';
+import de_overpass from './maps/de_overpass.js';
+import cs_office from './maps/cs_office.js';
+import cs_italy from './maps/cs_italy.js';
+import cs_agency from './maps/cs_agency.js';
+import de_edin from './maps/de_edin.js';
+import de_grail from './maps/de_grail.js';
+import de_palais from './maps/de_palais.js';
+import de_basalt from './maps/de_basalt.js';
+import de_brewery from './maps/de_brewery.js';
+import de_whistle from './maps/de_whistle.js';
+import de_dogtown from './maps/de_dogtown.js';
 
 export { WALL_HEIGHT };
 export const BOUND_WALL_HEIGHT = 9;
 
 /** The real map list, dust2 first. */
-export const MAPS = [de_dust2, de_mirage, de_inferno, de_nuke, de_ancient, de_anubis, de_vertigo, de_train];
+export const MAPS = [
+  de_dust2, de_mirage, de_inferno, de_nuke, de_ancient, de_anubis, de_vertigo, de_train,
+  de_overpass, cs_office, cs_italy, cs_agency,
+  de_edin, de_grail, de_palais, de_basalt, de_brewery, de_whistle, de_dogtown,
+];
 export const MAP_BY_ID = Object.fromEntries(MAPS.map((m) => [m.id, m]));
 
 /** Cosmetic palettes per map theme. */
@@ -49,6 +64,11 @@ export const THEMES = {
     label: 'JUNGLE', desc: 'Yosun, taş, nemli hava',
     wall: 0x8d8f72, wallDark: 0x5f6349, floor: 0x7d8460, ground: 0x5d6b47, groundTint: 0x8f9c6b,
     crate: 0x6b5533, sky: [0xa9c3b0, 0xd0dcc8, 0xe6eddc], sun: 0xe6f2cf, hemi: [0xd8e6d0, 0x4f5c3f],
+  },
+  sanctuary: {
+    label: 'SANCTUARY', desc: 'Mermer, altın, kutsal ışık',
+    wall: 0xd9cfae, wallDark: 0xa89a72, floor: 0xcabf9c, ground: 0xb0a583, groundTint: 0xe4dcc0,
+    crate: 0x9a8a5f, sky: [0xf0d9a8, 0xe8cfae, 0xf6ecd2], sun: 0xfff2cc, hemi: [0xf2e8cf, 0x8a7c5e],
   },
   concrete: {
     label: 'VERTIGO', desc: 'Yüksek beton, cam cephe',
@@ -99,14 +119,28 @@ function spotScore(baked, spot) {
 }
 
 /**
+ * Async variant: makes sure the baked waypoint table of `mapId` has been
+ * downloaded (they are code-split per map), then activates it. Used before a
+ * match starts and by the map gallery when the player hovers a card.
+ */
+export async function ensureMap(mapId) {
+  const map = MAP_BY_ID[mapId] || MAPS[0];
+  await loadBakedMap(map.id);
+  return applyMap(map.id);
+}
+
+export { preloadBakedMap };
+
+/**
  * Build (once) and activate the layout of a real map.
  * Returns the ready-to-use arena description.
  */
-export function applyMap(mapId) {
+export function applyMap(mapId, { bake = false } = {}) {
   const map = MAP_BY_ID[mapId] || MAPS[0];
   CURRENT_MAP = map;
-  if (!built || built.id !== map.id) {
-    const baked = bakedMap(map.id);
+  const baked = bakedMap(map.id);
+  // a metadata-only placeholder (see below) is never a finished build
+  if (!built || built.id !== map.id || (baked && !built.nodes.length)) {
     if (baked) {
       // pre-baked at build time by tools/genmaps.mjs: no geometry work on load
       const TAG_NAMES = ['map', 'A', 'B', 'mid', 'spawn'];
@@ -140,6 +174,18 @@ export function applyMap(mapId) {
         spots.attackPaths[key] = routes;
       }
       built = { id: map.id, walls: baked.WALLS, nodes, edges, spots, theme: THEMES[map.theme] || THEMES.sand, ...extra };
+    } else if (!bake) {
+      // The baked table for this arena has not been fetched yet (they are code
+      // split). Publish the metadata only — the heavy mask bake below is the
+      // slow path and must never run at boot; ensureMap() awaits the real data.
+      built = {
+        id: map.id,
+        walls: [],
+        nodes: [],
+        edges: [],
+        spots: { plantSpots: { A: [], B: [] }, holdSpots: { A: [], B: [], mid: [] }, attackPaths: { A: {}, B: {} } },
+        theme: THEMES[map.theme] || THEMES.sand,
+      };
     } else {
       const cells = decodeMask(map);
       const walls = buildWalls(map, cells);

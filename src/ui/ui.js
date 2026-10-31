@@ -2,7 +2,7 @@ import { AGENT_LIST, AGENTS, agentPortraitSVG } from '../game/agents.js';
 import {
   MAP_ART, WEAPON_SKINS, skinImageUrl, loadImagePlain, detectCdn,
 } from '../game/csgoAssets.js';
-import { THEMES, MAPS, MAP_BY_ID, CURRENT_MAP, applyMap, worldToRadar } from '../world/mapLayout.js';
+import { THEMES, MAPS, MAP_BY_ID, CURRENT_MAP, applyMap, ensureMap, preloadBakedMap, worldToRadar } from '../world/mapLayout.js';
 import { BUY_ORDER, BUY_GROUPS, WEAPONS, weaponIconSVG } from '../game/weapons.js';
 import { WALLS, PROPS, SITES, SPAWNS, MAP_BOUNDS } from '../world/mapLayout.js';
 import { WeaponPreview } from './weaponPreview.js';
@@ -1507,17 +1507,19 @@ export class UI {
       <div class="map-card ${m.id === activeId ? 'active' : ''}" data-mapid="${m.id}" title="${m.name} haritasında oyna">
         <div class="map-fallback">${m.name}</div>
         <img src="${m.radar}" alt="${m.name}" loading="lazy" />
-        <div class="map-tag">${m.name}<small>${m.desc} · ${m.sites.A.center.x.toFixed(0)},${m.sites.A.center.z.toFixed(0)}</small></div>
+        <div class="map-tag">${m.name}<small>${m.desc} · ${m.mode}</small></div>
       </div>`).join('');
 
     this.el.mapsGrid.querySelectorAll('[data-mapid]').forEach((card) => {
+      // hovering a card starts fetching that map's waypoint chunk in the background
+      card.addEventListener('mouseenter', () => preloadBakedMap(card.dataset.mapid));
       card.addEventListener('click', () => {
         const id = card.dataset.mapid;
         if (!MAP_BY_ID[id]) return;
         this.settings.map = id;
         this.save();
-        applyMap(id);
         audio.play('ui_click');
+        ensureMap(id).catch(() => applyMap(id));
         this.showMapsGallery(false);
         this.toast(`<b>${MAP_BY_ID[id].name}</b> seçildi — maç bu haritada oynanacak`, 2.6);
         this._pickHeroArt();

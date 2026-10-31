@@ -1,6 +1,7 @@
 import { Game } from './game/game.js';
 import { UI, DEFAULT_SETTINGS } from './ui/ui.js';
 import { audio } from './core/audio.js';
+import { ensureMap } from './world/mapLayout.js';
 
 const canvas = document.getElementById('game-canvas');
 
@@ -31,7 +32,7 @@ const ui = new UI({
   },
 });
 
-function startMatch(agentId, settings) {
+async function startMatch(agentId, settings) {
   if (game) {
     game.stop();
     game = null;
@@ -43,7 +44,15 @@ function startMatch(agentId, settings) {
   oldCanvas.replaceWith(freshCanvas);
   const loadingEl = document.getElementById('loading');
   loadingEl.classList.remove('hidden', 'fade');
-  ui.setLoading(0.15, 'DUNE HARİTASI DERLENİYOR…');
+  ui.setLoading(0.15, 'HARİTA VERİSİ İNDİRİLİYOR…');
+
+  // fetch (code-split) the baked waypoint table of the selected map first
+  try {
+    await ensureMap(settings.map || 'de_dust2');
+  } catch (err) {
+    console.error('map load failed', err);
+  }
+  ui.setLoading(0.32, 'HARİTA DERLENİYOR…');
 
   // let the loading screen paint before the heavy scene build
   requestAnimationFrame(() => {

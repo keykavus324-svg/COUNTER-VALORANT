@@ -24,19 +24,33 @@ const UNIT = 0.0254;
 const CELL = 0.5;
 
 const MAPS = [
-  { id: 'de_dust2', name: 'DUST II', theme: 'sand' },
-  { id: 'de_mirage', name: 'MIRAGE', theme: 'sand' },
-  { id: 'de_inferno', name: 'INFERNO', theme: 'terracotta' },
-  { id: 'de_nuke', name: 'NUKE', theme: 'industrial' },
-  { id: 'de_ancient', name: 'ANCIENT', theme: 'jungle' },
-  { id: 'de_anubis', name: 'ANUBIS', theme: 'sand' },
-  { id: 'de_vertigo', name: 'VERTIGO', theme: 'concrete' },
-  { id: 'de_train', name: 'TRAIN', theme: 'industrial' },
+  // --- Active Duty ---
+  { id: 'de_dust2', name: 'DUST II', theme: 'sand', kind: 'defuse' },
+  { id: 'de_mirage', name: 'MIRAGE', theme: 'sand', kind: 'defuse' },
+  { id: 'de_inferno', name: 'INFERNO', theme: 'terracotta', kind: 'defuse' },
+  { id: 'de_nuke', name: 'NUKE', theme: 'industrial', kind: 'defuse' },
+  { id: 'de_ancient', name: 'ANCIENT', theme: 'jungle', kind: 'defuse' },
+  { id: 'de_anubis', name: 'ANUBIS', theme: 'sand', kind: 'defuse' },
+  { id: 'de_vertigo', name: 'VERTIGO', theme: 'concrete', kind: 'defuse' },
+  { id: 'de_train', name: 'TRAIN', theme: 'industrial', kind: 'defuse' },
+  // --- klasikler ---
+  { id: 'de_overpass', name: 'OVERPASS', theme: 'jungle', kind: 'defuse' },
+  { id: 'cs_office', name: 'OFFICE', theme: 'concrete', kind: 'hostage' },
+  { id: 'cs_italy', name: 'ITALY', theme: 'terracotta', kind: 'hostage' },
+  { id: 'cs_agency', name: 'AGENCY', theme: 'concrete', kind: 'hostage' },
+  // --- yeni haritalar ---
+  { id: 'de_edin', name: 'EDIN', theme: 'concrete', kind: 'defuse' },
+  { id: 'de_grail', name: 'GRAIL', theme: 'sanctuary', kind: 'defuse' },
+  { id: 'de_palais', name: 'PALAIS', theme: 'terracotta', kind: 'defuse' },
+  { id: 'de_basalt', name: 'BASALT', theme: 'industrial', kind: 'defuse' },
+  { id: 'de_brewery', name: 'BREWERY', theme: 'terracotta', kind: 'defuse' },
+  { id: 'de_whistle', name: 'WHISTLE', theme: 'jungle', kind: 'defuse' },
+  { id: 'de_dogtown', name: 'DOGTOWN', theme: 'sand', kind: 'defuse' },
 ];
 
 function parseMeta(txt) {
   const grab = (key) => {
-    const m = txt.match(new RegExp(`"${key}"\\s+"?([-\\d.]+)"?`));
+    const m = txt.match(new RegExp(`"${key}"\\s*"?\\s*([-\\d.]+)`));
     return m ? parseFloat(m[1]) : null;
   };
   return {
@@ -63,7 +77,7 @@ const classify = (r, g, b, a) => {
   return 1;                                               // tinted floor
 };
 
-for (const { id, name, theme } of MAPS) {
+for (const { id, name, theme, kind } of MAPS) {
   const pngPath = path.join(SRC, `${id}.png`);
   if (!fs.existsSync(pngPath)) { console.warn('skip (no radar)', id); continue; }
   const png = PNG.sync.read(fs.readFileSync(pngPath));
@@ -117,6 +131,8 @@ for (const { id, name, theme } of MAPS) {
   });
   const worldOf = (c, r) => ({ x: x0 + (c + 0.5) * CELL, z: z1 - (r + 0.5) * CELL });
 
+  const hasSpawns = meta.tSpawn[0] != null && meta.ctSpawn[0] != null;
+  const hasSites = meta.bombA[0] != null && meta.bombB[0] != null;
   const tGuess = cellOf(px2world(meta.tSpawn[0] ?? 0.5, meta.tSpawn[1] ?? 0.9));
   const ctGuess = cellOf(px2world(meta.ctSpawn[0] ?? 0.5, meta.ctSpawn[1] ?? 0.1));
   const aGuess = cellOf(px2world(meta.bombA[0] ?? 0.8, meta.bombA[1] ?? 0.2));
@@ -198,8 +214,91 @@ for (const { id, name, theme } of MAPS) {
     return best || { c: Math.round(main.c), r: Math.round(main.r) };
   };
 
-  const seed = nearestInMain(tGuess.c, tGuess.r);
-  const ct = nearestInMain(ctGuess.c, ctGuess.r);
+  /**
+   * Community maps ship without spawn / bombsite metadata. Infer them from the
+   * walkable island: the two spawns sit at the opposite ends of the longest
+   * axis, and the sites are the two pockets furthest from the spawn line.
+   */
+  const inferLayout = () => {
+    const cellsSample = [];
+    for (let r = 0; r < rows; r += 2) {
+      for (let c = 0; c < cols; c += 2) if (grid[r * cols + c]) cellsSample.push({ c, r });
+    }
+    if (!cellsSample.length) return null;
+    let minC = Infinity; let maxC = -Infinity; let minR = Infinity; let maxR = -Infinity;
+    for (const p of cellsSample) {
+      minC = Math.min(minC, p.c); maxC = Math.max(maxC, p.c);
+      minR = Math.min(minR, p.r); maxR = Math.max(maxR, p.r);
+    }
+    // double sweep: BFS from an arbitrary cell, then from the farthest cell
+    const sweep = (start) => {
+      const dist = new Int32Array(cols * rows).fill(-1);
+      const q = [start.r * cols + start.c];
+      dist[q[0]] = 0;
+      let far = start;
+      let farD = 0;
+      for (let head = 0; head < q.length; head++) {
+        const i = q[head];
+        const c = i % cols;
+        const r = (i - c) / cols;
+        const d = dist[i];
+        if (d > farD) { farD = d; far = { c, r }; }
+        for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const cc = c + dc; const rr = r + dr;
+          if (cc < 0 || rr < 0 || cc >= cols || rr >= rows) continue;
+          const j = rr * cols + cc;
+          if (!grid[j] || dist[j] >= 0) continue;
+          dist[j] = d + 1;
+          q.push(j);
+        }
+      }
+      return far;
+    };
+    const endA = sweep(cellsSample[0]);
+    const endB = sweep(endA);
+    const t = endA;
+    const ctCell = endB;
+    const dx = ctCell.c - t.c;
+    const dr = ctCell.r - t.r;
+    const len = Math.hypot(dx, dr) || 1;
+    // sites: the farthest apart pair of cells inside the middle band of the
+    // island — that is where a bomb site can realistically sit.
+    const band = [];
+    for (const p2 of cellsSample) {
+      const along = ((p2.c - t.c) * dx + (p2.r - t.r) * dr) / len;
+      if (along > len * 0.25 && along < len * 0.9) band.push(p2);
+    }
+    const pool = band.length > 6 ? band : cellsSample;
+    let bestA = pool[0];
+    let bestB = pool[pool.length - 1];
+    let bestD = -1;
+    const step2 = Math.max(1, Math.floor(pool.length / 260));
+    for (let i = 0; i < pool.length; i += step2) {
+      for (let j = i + step2; j < pool.length; j += step2) {
+        const d = (pool[i].c - pool[j].c) ** 2 + (pool[i].r - pool[j].r) ** 2;
+        if (d > bestD) { bestD = d; bestA = pool[i]; bestB = pool[j]; }
+      }
+    }
+    return {
+      t: t || null,
+      ct: ctCell || null,
+      a: bestA || null,
+      b: bestB || null,
+    };
+  };
+
+  const inferred = inferLayout();
+
+  const seed = hasSpawns
+    ? nearestInMain(tGuess.c, tGuess.r)
+    : (inferred?.t || nearestInMain(tGuess.c, tGuess.r));
+  const ct = hasSpawns
+    ? nearestInMain(ctGuess.c, ctGuess.r)
+    : (inferred?.ct || nearestInMain(ctGuess.c, ctGuess.r));
+  if (!hasSites && inferred) {
+    aGuess.c = inferred.a.c; aGuess.r = inferred.a.r;
+    bGuess.c = inferred.b.c; bGuess.r = inferred.b.r;
+  }
 
   const siteFrom = (guess) => {
     const s = nearestInMain(guess.c, guess.r, 40);
@@ -221,8 +320,24 @@ for (const { id, name, theme } of MAPS) {
     return { center, radius: Math.max(4, Math.min(12, rad + 1.5)), cell: s };
   };
 
-  const siteA = siteFrom(aGuess);
-  const siteB = siteFrom(bGuess);
+  let siteA = siteFrom(aGuess);
+  let siteB = siteFrom(bGuess);
+
+  // --- sanity pass: community maps often ship bogus landmark coordinates ---
+  const far = (p, q) => Math.hypot(p.x - q.x, p.z - q.z);
+  if (inferred && far(siteA.center, siteB.center) < 18) {
+    siteA = siteFrom(inferred.a);
+    siteB = siteFrom(inferred.b);
+  }
+  if (inferred && siteA.cell && siteB.cell
+    && Math.abs(siteA.cell.c - siteB.cell.c) + Math.abs(siteA.cell.r - siteB.cell.r) < 20) {
+    siteA = siteFrom(inferred.a);
+    siteB = siteFrom(inferred.b);
+  }
+  if (far(worldOf(seed.c, seed.r), worldOf(ct.c, ct.r)) < 25 && inferred) {
+    seed.c = inferred.t.c; seed.r = inferred.t.r;
+    ct.c = inferred.ct.c; ct.r = inferred.ct.r;
+  }
 
   const cluster = (base, count) => {
     const out = [];
@@ -248,6 +363,7 @@ for (const { id, name, theme } of MAPS) {
     id,
     name,
     theme,
+    kind: kind || 'defuse',
     radar: `/art/csgo/maps/${id}.png`,
     cell: CELL,
     cols,

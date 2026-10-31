@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import {
-  MAPS, applyMap, WALLS, NAV_NODES, NAV_EDGES, SPAWNS, SITES, PLANT_SPOTS, HOLD_SPOTS,
+  MAPS, applyMap, ensureMap, WALLS, NAV_NODES, NAV_EDGES, SPAWNS, SITES, PLANT_SPOTS, HOLD_SPOTS,
 } from '../src/world/mapLayout.js';
 import { decodeMask } from '../src/world/gridLayout.js';
 
@@ -36,7 +36,7 @@ const nearest = (x, z) => {
 const rows = [];
 let bad = 0;
 for (const map of MAPS) {
-  applyMap(map.id);
+  await ensureMap(map.id);
   const cells = decodeMask(map);
   const walkCells = cells.reduce((a, b) => a + b, 0);
   const start = nearest(SPAWNS.attacker[0].x, SPAWNS.attacker[0].z);

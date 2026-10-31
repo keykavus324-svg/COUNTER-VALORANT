@@ -117,7 +117,72 @@ export function buildNav(map, cells) {
       edges[i].push({ to: j, cost: Math.hypot(n.x - nodes[j].x, n.z - nodes[j].z) });
     }
   });
+  linkIslands(nodes, edges);
   return { nodes, edges };
+}
+
+/**
+ * The 2D radar mask cannot describe stairs, ramps and lifts, so an upper floor
+ * (de_overpass bombsite A, nuke's ramp rooms ...) can end up as a walkable
+ * island. Any small island whose closest waypoint sits within a few metres of
+ * the main graph gets a two-way "stairs" edge, which is exactly what the real
+ * map has there. Genuinely disconnected junk is left alone.
+ */
+export function linkIslands(nodes, edges, maxGap = 3.4) {
+  if (!nodes.length) return;
+  const comp = new Int32Array(nodes.length).fill(-1);
+  const comps = [];
+  for (let i = 0; i < nodes.length; i++) {
+    if (comp[i] >= 0) continue;
+    const id = comps.length;
+    const stack = [i];
+    const list = [];
+    comp[i] = id;
+    while (stack.length) {
+      const n = stack.pop();
+      list.push(n);
+      for (const e of edges[n] || []) {
+        if (comp[e.to] < 0) { comp[e.to] = id; stack.push(e.to); }
+      }
+    }
+    comps.push(list);
+  }
+  if (comps.length < 2) return;
+  comps.sort((a, b) => b.length - a.length);
+  const main = comps[0];
+  // spatial hash of the main component so the nearest-pair search stays cheap
+  const BUCKET = 4;
+  const buckets = new Map();
+  const key = (x, z) => `${Math.floor(x / BUCKET)}:${Math.floor(z / BUCKET)}`;
+  for (const i of main) {
+    const k = key(nodes[i].x, nodes[i].z);
+    if (!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k).push(i);
+  }
+  let linked = 0;
+  for (const island of comps.slice(1)) {
+    if (island.length < 6 || island.length > main.length) continue;
+    let best = null;
+    for (const i of island) {
+      const bx = Math.floor(nodes[i].x / BUCKET);
+      const bz = Math.floor(nodes[i].z / BUCKET);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          for (const j of buckets.get(`${bx + dx}:${bz + dz}`) || []) {
+            const d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].z - nodes[j].z);
+            if (!best || d < best.d) best = { i, j, d };
+          }
+        }
+      }
+    }
+    if (!best || best.d > maxGap) continue;
+    // stairs cost a little extra so bots prefer real corridors when they exist
+    const cost = +(best.d * 1.35 + 0.4).toFixed(2);
+    edges[best.i].push({ to: best.j, cost, stairs: true });
+    edges[best.j].push({ to: best.i, cost, stairs: true });
+    linked++;
+  }
+  return linked;
 }
 
 const nearest = (nodes, x, z) => {
