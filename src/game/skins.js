@@ -1,13 +1,13 @@
 /**
  * Weapon skin system.
  *
- * Real Valorant skin renders (transparent PNGs from media.valorant-api.com) are
+ * Real Counter-Strike finish renders (Valve's economy-image CDN) are
  * projected onto the flanks of every gun model — first person viewmodel, the
  * third person models of the bots and the buy menu / vault thumbnails. If the
  * CDN is unreachable the models simply keep their procedural materials.
  */
 import * as THREE from 'three';
-import { WEAPON_SKINS, skinIconUrl, agentArtUrl, loadImage, cdnStatus } from './valoAssets.js';
+import { WEAPON_SKINS, skinImageUrl, loadImage, cdnStatus } from './csgoAssets.js';
 
 const textureCache = new Map();   // uuid -> THREE.Texture | null (failed)
 const pending = new Map();        // uuid -> Promise<THREE.Texture|null>
@@ -20,8 +20,17 @@ export function skinList(weaponId) {
   return WEAPON_SKINS[weaponId] || [];
 }
 
+export function findSkin(uuid) {
+  if (!uuid) return null;
+  for (const list of Object.values(WEAPON_SKINS)) {
+    const hit = list.find((s) => s.id === uuid || s.uuid === uuid);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 export function skinById(weaponId, uuid) {
-  return skinList(weaponId).find((s) => s.uuid === uuid) || null;
+  return skinList(weaponId).find((s) => s.id === uuid || s.uuid === uuid) || null;
 }
 
 export function defaultSkin(weaponId) {
@@ -45,9 +54,11 @@ export function resolveSkin(weaponId, skinMap) {
 /* ------------------------------------------------------------------ */
 export function getSkinTexture(uuid) {
   if (!uuid) return null;
+  const skin = findSkin(uuid);
+  if (!skin) return null;
   if (textureCache.has(uuid)) return textureCache.get(uuid);
   if (!pending.has(uuid)) {
-    const p = loadImage(skinIconUrl(uuid), { timeout: 12000 })
+    const p = loadImage(skinImageUrl(skin), { timeout: 10000 })
       .then((img) => {
         if (!img) { textureCache.set(uuid, null); return null; }
         const tex = new THREE.Texture(img);
@@ -75,7 +86,7 @@ export function preloadSkins(weaponIds = null) {
   const ids = weaponIds || Object.keys(WEAPON_SKINS);
   let n = 0;
   for (const w of ids) {
-    for (const s of skinList(w)) { getSkinTexture(s.uuid); n++; }
+    for (const s of skinList(w)) { getSkinTexture(s.id); n++; }
   }
   return n;
 }
@@ -88,36 +99,55 @@ export function preloadSkins(weaponIds = null) {
  *  the procedural gun when the real render cannot be downloaded, so every skin
  *  still reads as a different, coherent paint job. */
 const SKIN_PALETTES = [
-  { match: /prime/i, body: '#f0ece2', accent: '#d9b768', trim: '#1d2530' },
-  { match: /reaver/i, body: '#231a2e', accent: '#8b45ff', trim: '#0d0a12' },
-  { match: /glitchpop/i, body: '#141018', accent: '#ff2f9e', trim: '#22e0ff' },
-  { match: /elderflame/i, body: '#1b1a1f', accent: '#ff7a1a', trim: '#ffd24a' },
-  { match: /gaia/i, body: '#1d3524', accent: '#7ce07a', trim: '#f2e6c9' },
-  { match: /oni/i, body: '#1a1a20', accent: '#c8202c', trim: '#e9dcc4' },
-  { match: /spectrum/i, body: '#101014', accent: '#ff2e88', trim: '#3ce0ff' },
-  { match: /magepunk/i, body: '#1b2a3a', accent: '#38e0ff', trim: '#c9a35a' },
-  { match: /sovereign/i, body: '#e6e2da', accent: '#4a8bd8', trim: '#c9a35a' },
-  { match: /ruination/i, body: '#16241a', accent: '#5ce07a', trim: '#d8c78a' },
-  { match: /sentinels/i, body: '#12121a', accent: '#c9a3ff', trim: '#ffffff' },
-  { match: /ion/i, body: '#0f1620', accent: '#4fd8ff', trim: '#e8f6ff' },
-  { match: /spline/i, body: '#1a1a24', accent: '#8a7bff', trim: '#3be0c0' },
-  { match: /origin/i, body: '#101010', accent: '#ff5a2a', trim: '#8f8f96' },
-  { match: /champions/i, body: '#141418', accent: '#ffd24a', trim: '#c0c6cc' },
-  { match: /prelude|chaos/i, body: '#181014', accent: '#ff2f3e', trim: '#7a1fff' },
-  { match: /forsaken/i, body: '#1b2430', accent: '#6fd6c6', trim: '#d9c48a' },
-  { match: /xenohunter/i, body: '#151a16', accent: '#b6ff3c', trim: '#2b3a2b' },
-  { match: /rgx/i, body: '#0d0f14', accent: '#ff2f6e', trim: '#ffd24a' },
-  { match: /piedra|sol/i, body: '#2a1d16', accent: '#e8a13a', trim: '#7ac0b0' },
-  { match: /neptune/i, body: '#0f2a33', accent: '#31e0d0', trim: '#f0f4f5' },
-  { match: /endeavour/i, body: '#1c1f26', accent: '#ff8a3d', trim: '#dfe6ec' },
-  { match: /aristo/i, body: '#241a2c', accent: '#d9b768', trim: '#7a2bff' },
+  { match: /asiimov/i, body: '#e9e7e0', accent: '#f08a1e', trim: '#20242a' },
+  { match: /redline/i, body: '#2a2b2f', accent: '#d33a3a', trim: '#efefef' },
+  { match: /dragon lore|lore/i, body: '#3e6b3a', accent: '#d8b35a', trim: '#20301e' },
+  { match: /hyper beast/i, body: '#1f3f4a', accent: '#ff7a3c', trim: '#7ce8d8' },
+  { match: /printstream/i, body: '#f2f2f2', accent: '#1a1a1c', trim: '#b9bec4' },
+  { match: /neo-noir/i, body: '#15161a', accent: '#ff3d8a', trim: '#c9c9d2' },
+  { match: /fade/i, body: '#f0c24a', accent: '#ff5fb0', trim: '#5a2bbf' },
+  { match: /blaze/i, body: '#141414', accent: '#ff6a1e', trim: '#ffd24a' },
+  { match: /case hardened|hardened/i, body: '#38508a', accent: '#c8a45c', trim: '#1b2b4d' },
+  { match: /doppler/i, body: '#1a1230', accent: '#7a4bff', trim: '#3ce0ff' },
+  { match: /tiger tooth/i, body: '#f2e3b8', accent: '#111111', trim: '#e0a93c' },
+  { match: /crimson web/i, body: '#1d1013', accent: '#b3122a', trim: '#e8e2e2' },
+  { match: /bloodsport/i, body: '#1b1d21', accent: '#d92b2b', trim: '#f0f0f0' },
+  { match: /vulcan/i, body: '#e8eaec', accent: '#2b6bd8', trim: '#22262a' },
+  { match: /nightwish/i, body: '#101a2c', accent: '#4fc8ff', trim: '#e0b45c' },
+  { match: /empress/i, body: '#231b2e', accent: '#c94f6d', trim: '#d9b768' },
+  { match: /desolate space/i, body: '#1d2733', accent: '#39c8b4', trim: '#d9d2c2' },
+  { match: /wildfire/i, body: '#2a1a10', accent: '#ff7a1a', trim: '#e0c08a' },
+  { match: /containment breach/i, body: '#16303a', accent: '#7aff5a', trim: '#243b45' },
+  { match: /water elemental|ocean drive|dark water/i, body: '#123a55', accent: '#39c8e8', trim: '#dff4ff' },
+  { match: /howl/i, body: '#2b1d12', accent: '#ff5a1e', trim: '#c8a45c' },
+  { match: /bullet queen/i, body: '#22141f', accent: '#ff3d9a', trim: '#f0d24a' },
+  { match: /neon rider/i, body: '#140f24', accent: '#ff2ea6', trim: '#22e0ff' },
+  { match: /starlight/i, body: '#1a1430', accent: '#a06bff', trim: '#ffe9a8' },
+  { match: /mecha|cyber|mainframe/i, body: '#20262c', accent: '#2ee0c8', trim: '#cfd6dc' },
+  { match: /slaughter/i, body: '#2a0d12', accent: '#e01b32', trim: '#f2f2f2' },
+  { match: /marble fade/i, body: '#e8e2ef', accent: '#ff5fa8', trim: '#3ad0c8' },
+  { match: /ultraviolet|blue steel/i, body: '#191a20', accent: '#7a5ad8', trim: '#9099a8' },
 ];
+
 const DEFAULT_PALETTE = { body: '#2b3038', accent: '#ff4655', trim: '#cfd6dc' };
 
-export function paletteFor(skinName) {
-  if (!skinName) return DEFAULT_PALETTE;
-  const hit = SKIN_PALETTES.find((p) => p.match.test(skinName));
-  return hit || DEFAULT_PALETTE;
+/** Rarity colour → darker body / brighter trim so every finish is distinct. */
+function paletteFromRarity(hex) {
+  if (!hex || !/^#?[0-9a-f]{6}$/i.test(hex)) return DEFAULT_PALETTE;
+  const c = new THREE.Color(hex.startsWith('#') ? hex : `#${hex}`);
+  const hsl = {};
+  c.getHSL(hsl);
+  const body = new THREE.Color().setHSL(hsl.h, Math.min(1, hsl.s * 0.55 + 0.08), Math.max(0.1, hsl.l * 0.34));
+  const trim = new THREE.Color().setHSL(hsl.h, Math.min(1, hsl.s * 0.35), Math.min(0.92, hsl.l * 0.92 + 0.24));
+  return { body: `#${body.getHexString()}`, accent: `#${c.getHexString()}`, trim: `#${trim.getHexString()}` };
+}
+
+export function paletteFor(skinOrName) {
+  const name = typeof skinOrName === 'string' ? skinOrName : skinOrName?.full || skinOrName?.name;
+  const rarity = typeof skinOrName === 'object' ? skinOrName?.color : null;
+  if (!name) return DEFAULT_PALETTE;
+  const hit = SKIN_PALETTES.find((p) => p.match.test(name));
+  return hit || paletteFromRarity(rarity) || DEFAULT_PALETTE;
 }
 
 /* ------------------------------------------------------------------ */
@@ -138,11 +168,11 @@ function skinSeed(name) {
 /**
  * Paints a tileable canvas texture for a skin: base colour, family motif and
  * trim. This is what the guns wear when the CDN renders are unavailable, so the
- * weapons still look like painted Valorant skins instead of grey boxes.
+ * weapons still look like painted CS finishes instead of grey boxes.
  */
 export function skinPatternTexture(skin) {
   if (!skin) return null;
-  const key = `${skin.name}|${skin.uuid}`;
+  const key = `${skin.name}|${skin.id || skin.uuid}`;
   if (patternCache.has(key)) return patternCache.get(key);
 
   const size = 256;
@@ -363,7 +393,7 @@ function clearDecals(model) {
  */
 export function applySkinDecal(model, skin, { opacity = 1, texture = null } = {}) {
   if (!model || !skin) return false;
-  const tex = texture || getSkinTexture(skin.uuid);
+  const tex = texture || getSkinTexture(skin.id || skin.uuid);
   if (!tex) return false;
   clearDecals(model);
 
@@ -469,7 +499,7 @@ export function skinsOnline() {
 /* ------------------------------------------------------------------ */
 const artTextures = new Map();
 
-/** Load any Valorant artwork as a THREE texture (null when unavailable). */
+/** Load any remote artwork as a THREE texture (null when unavailable). */
 export function getArtTexture(url, { timeout = 12000 } = {}) {
   if (!url) return null;
   if (artTextures.has(url)) return artTextures.get(url);
@@ -492,4 +522,3 @@ export function whenArtReady(urls, cb) {
   });
 }
 
-export { agentArtUrl };

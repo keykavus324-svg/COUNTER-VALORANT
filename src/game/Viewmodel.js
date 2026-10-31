@@ -55,11 +55,11 @@ export class Viewmodel {
     this.equipOffset = 0;
     this.adsAmount = 0;
     this.weaponId = null;
-    this.agentId = 'blaze';
+    this.agentId = 'phoenix';
     this._weaponModels = new Map();
     this.skinMap = null;
 
-    this.setAgent('blaze');
+    this.setAgent('phoenix');
   }
 
   _buildArms() {
@@ -105,7 +105,7 @@ export class Viewmodel {
 
   setAgent(agentId) {
     this.agentId = agentId;
-    const agent = AGENTS[agentId] || AGENTS.blaze;
+    const agent = AGENTS[agentId] || AGENTS.phoenix;
     if (this.armMats) {
       this.armMats.sleeveMat.color.set(agent.colors.fabric);
       this.armMats.sleeveMat.emissive = new THREE.Color(agent.colors.primary).multiplyScalar(0.12);

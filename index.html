@@ -4,8 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <meta name="theme-color" content="#0f1923" />
-<title>COUNTER VALORANT — Tarayıcıda Taktik FPS</title>
-<meta name="description" content="Counter Valorant: tarayıcıda çalışan, Valorant tarzı ajan yetenekleri ve CS tarzı taktik nişancılık içeren ücretsiz FPS." />
+<title>COUNTER-STRIKE: BROWSER OPS — Tarayıcıda Taktik FPS</title>
+<meta name="description" content="Gerçek CS2 haritalarında, gerçek CS:GO silah kaplamalarıyla tarayıcıda çalışan ücretsiz taktik FPS." />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%230f1923'/><path d='M14 48 L32 12 L50 48 L32 38 Z' fill='%23ff4655'/></svg>" />
 <link rel="stylesheet" href="./src/styles.css" />
 </head>
@@ -79,8 +79,8 @@
     <!-- center messages -->
     <div id="round-banner" class="hidden"><div class="rb-inner"><div class="rb-sub"></div><div class="rb-title"></div></div></div>
     <div id="center-toast"></div>
-    <div id="plant-progress" class="hidden"><div class="pp-ring"></div><span>SPIKE KURULUYOR</span></div>
-    <div id="defuse-progress" class="hidden"><div class="pp-ring"></div><span>SPIKE ÇÖZÜLÜYOR</span></div>
+    <div id="plant-progress" class="hidden"><div class="pp-ring"></div><span>BOMBA KURULUYOR</span></div>
+    <div id="defuse-progress" class="hidden"><div class="pp-ring"></div><span>BOMBA ÇÖZÜLÜYOR</span></div>
     <div id="spectate-note" class="hidden"></div>
     <div id="interact-hint" class="hidden"></div>
     <div id="kill-banner" class="hidden"></div>
@@ -88,7 +88,7 @@
     <!-- scoreboard -->
     <div id="scoreboard" class="overlay hidden">
       <div class="sb-inner">
-        <div class="sb-head"><span class="sb-map">DUNE</span><span class="sb-mode">TAKTİK / 5v5 — SPIKE</span><span id="sb-score">0 - 0</span></div>
+        <div class="sb-head"><span class="sb-map">DUNE</span><span class="sb-mode">DEFUSE / 5v5</span><span id="sb-score">0 - 0</span></div>
         <div class="sb-teams">
           <div class="sb-team" id="sb-allies"></div>
           <div class="sb-team enemy" id="sb-enemies"></div>
@@ -200,10 +200,11 @@
       </div>
     </header>
     <div class="menu-hero">
-      <div class="menu-kicker">TAKTİK FPS · AJAN YETENEKLERİ · TARAYICIDA</div>
-      <h1 class="game-logo">COUNTER<br /><span>VALORANT</span></h1>
-      <p class="menu-sub">Klasik taktik nişancılığın disiplini, ajan yeteneklerinin kaosu.
-        Güçlerini kullan, spike'ı kur, takımını zafere taşı. <b>Kurulum yok — tarayıcıda çalışır.</b></p>
+      <div class="menu-kicker">GERÇEK CS2 HARİTALARI · CS:GO KAPLAMALARI · TARAYICIDA</div>
+      <h1 class="game-logo">COUNTER<br /><span>STRIKE</span></h1>
+      <p class="menu-sub">Dust II, Mirage, Inferno… resmî CS2 radar'larından üretilmiş gerçek
+        haritalar, gerçek CS:GO silah kaplamaları ve klasik defuse kuralları.
+        <b>Kurulum yok — tarayıcıda çalışır.</b></p>
       <div class="menu-actions">
         <button class="btn primary big" id="btn-play">
           <span>OYNA</span><small>5v5 TAKTİK MAÇ</small>
@@ -212,10 +213,10 @@
       </div>
       <div class="menu-actions secondary">
         <button class="btn slim" id="btn-skins"><span>SKIN KOLEKSİYONU</span><small>orijinal silah kaplamaları</small></button>
-        <button class="btn slim" id="btn-maps"><span>HARİTALAR</span><small>Valorant harita galerisi</small></button>
+        <button class="btn slim" id="btn-maps"><span>HARİTALAR</span><small>CS2 harita galerisi</small></button>
       </div>
       <div class="menu-stats">
-        <div><b id="stat-agents">4</b><span>AJAN</span></div>
+        <div><b id="stat-agents">4</b><span>OPERATÖR</span></div>
         <div><b id="stat-weapons">8</b><span>SİLAH</span></div>
         <div><b>60</b><span>FPS HEDEFİ</span></div>
         <div><b>0</b><span>KURULUM</span></div>
@@ -233,7 +234,7 @@
     <div class="agent-bg"></div>
     <header class="as-head">
       <div class="eyebrow">TAKIMINI SEÇ</div>
-      <h2>AJANINI KİLİTLE</h2>
+      <h2>OPERATÖRÜNÜ SEÇ</h2>
       <div class="as-side" id="as-side">TAKIM: <b>SALDIRI</b></div>
     </header>
     <div class="as-body">
@@ -255,7 +256,7 @@
     </div>
     <footer class="as-foot">
       <div class="as-map">HARİTA: <b>DUNE</b> <span>— iki bölge, üç koridor</span></div>
-      <button class="btn primary big" id="btn-lock">AJANI KİLİTLE <small>ve maçı başlat</small></button>
+      <button class="btn primary big" id="btn-lock">MAÇI BAŞLAT <small>seçili operatörle</small></button>
     </footer>
   </div>
 
@@ -292,17 +293,17 @@
             <li><b>R</b><span>Şarjör değiştir</span></li>
             <li><b>Q / E / C / X</b><span>Yetenekler</span></li>
             <li><b>B</b><span>Satın alma menüsü</span></li>
-            <li><b>F</b><span>Spike kur / çöz</span></li>
+            <li><b>F</b><span>Bomba kur / çöz</span></li>
             <li><b>Tab</b><span>Skor tablosu</span></li>
           </ul>
         </div>
         <div>
           <h3>MAÇ KURALLARI</h3>
-          <p><b class="accent">Saldırganlar</b> spike'ı A veya B bölgesine kurar. Kurulum 4 saniye sürer, ardından 45 saniyelik geri sayım başlar.
-            <b class="accent2">Defans</b> spike'ı çözmek için 7 saniye boyunca bölgede kalmalı — yarıda kalırsa süre sıfırlanır.</p>
-          <p>Round'u kazanmanın üç yolu: tüm rakip takımı elemek, spike'ı patlatmak veya spike'ı çözmek. İlk <b>5 roundu</b> alan takım maçı kazanır.</p>
+          <p><b class="accent">T (Teröristler)</b> C4'ü A veya B bölgesine kurar. Kurulum 4 saniye sürer, ardından 45 saniyelik geri sayım başlar.
+            <b class="accent2">CT (Anti-Teröristler)</b> bombayı çözmek için 7 saniye boyunca bölgede kalmalı — yarıda kalırsa süre sıfırlanır.</p>
+          <p>Round'u kazanmanın üç yolu: tüm rakip takımı elemek, C4'ü patlatmak veya bombayı çözmek. İlk <b>5 roundu</b> alan takım maçı kazanır.</p>
           <h3>EKONOMİ</h3>
-          <p>Her round başında kredi kazanırsın. Öldürme başına <b>₡200</b>, round kazanma <b>₡3000</b>, kaybetme <b>₡1900</b>, spike kurma <b>₡300</b>. Satın alma evresinde <b>B</b> ile silah, zırh ve yetenek al.</p>
+          <p>CS ekonomisi: öldürme başına <b>$300</b>, round kazanma <b>$3250</b>, kaybetme <b>$1400</b>, bomba kurma <b>$300</b>. Satın alma evresinde <b>B</b> ile silah, zırh ve el bombası al.</p>
           <h3>İPUÇLARI</h3>
           <ul class="tips">
             <li>Hareket ederken isabet oranı düşer — dur, nişan al, ateş et.</li>
@@ -345,7 +346,7 @@
   <div id="maps-gallery" class="overlay hidden">
     <div class="modal maps-m">
       <div class="eyebrow">SAVAŞ ALANLARI</div>
-      <h2>VALORANT HARİTALARI</h2>
+      <h2>CS2 HARİTALARI</h2>
       <div class="maps-grid" id="maps-grid"></div>
       <div class="modal-actions"><button class="btn primary" id="btn-maps-close">KAPAT</button></div>
     </div>
@@ -359,7 +360,7 @@
     <img id="load-art" class="load-art" alt="" />
     <div class="load-inner">
       <div class="load-mark"><svg viewBox="0 0 64 64"><path d="M8 52 L32 8 L56 52 L32 40 Z" /></svg></div>
-      <div class="load-title">COUNTER VALORANT</div>
+      <div class="load-title">COUNTER-STRIKE</div>
       <div class="load-bar"><i id="load-fill"></i></div>
       <div class="load-text" id="load-text">HARİTA DERLENİYOR…</div>
     </div>

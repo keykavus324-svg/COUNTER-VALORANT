@@ -7,7 +7,7 @@ import { audio } from '../core/audio.js';
  * Local player: camera, movement input, weapon handling and interaction.
  */
 export class Player extends Actor {
-  constructor(game, { agentId = 'blaze', name = 'SEN' } = {}) {
+  constructor(game, { agentId = 'phoenix', name = 'SEN' } = {}) {
     super(game, { team: 'ally', agentId, name, isPlayer: true });
     this.fovBase = 90;
     this.sensitivity = 0.45;
@@ -42,7 +42,7 @@ export class Player extends Actor {
     this.crouch = false;
     this.currentSlot = this.slots[1] ? 1 : 2;
     this.character.root.visible = false;
-    this.character.setWeapon(this.slots[this.currentSlot] || 'classic', this.game?.settings?.skins);
+    this.character.setWeapon(this.slots[this.currentSlot] || 'glock', this.game?.settings?.skins);
     this.equipTimer = 0.4;
     this.syncViewmodel?.();
     this.dead = false;

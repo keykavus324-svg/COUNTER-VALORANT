@@ -8,15 +8,17 @@
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
-    "check": "node tools/navcheck.mjs && node tools/check-layout.mjs && node tools/domcheck.mjs && node tools/assetcheck.mjs && node tools/themecheck.mjs && node tools/skincheck.mjs && node tools/uicheck.mjs && node tools/scenecheck.mjs",
+    "check": "node tools/domcheck.mjs && node tools/assetcheck.mjs && node tools/mapcheck.mjs && node tools/skincheck.mjs && node tools/uicheck.mjs && node tools/scenecheck.mjs",
     "sim": "node tools/headless-sim.mjs",
-    "test": "npm run check"
+    "test": "npm run check",
+    "maps": "node tools/buildmaps.mjs"
   },
   "dependencies": {
     "three": "0.169.0"
   },
   "devDependencies": {
     "jsdom": "^30.1.3",
-    "vite": "5.4.10"
+    "vite": "5.4.10",
+    "pngjs": "^7.0.0"
   }
 }

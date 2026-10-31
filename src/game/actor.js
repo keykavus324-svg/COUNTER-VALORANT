@@ -17,12 +17,12 @@ let uid = 0;
  * Player and Bot both extend this.
  */
 export class Actor {
-  constructor(game, { team = 'ally', agentId = 'blaze', name = 'AGENT', isPlayer = false }) {
+  constructor(game, { team = 'ally', agentId = 'phoenix', name = 'AGENT', isPlayer = false }) {
     this.id = ++uid;
     this.game = game;
     this.team = team;
     this.agentId = agentId;
-    this.agent = AGENTS[agentId] || AGENTS.blaze;
+    this.agent = AGENTS[agentId] || AGENTS.phoenix;
     this.name = name;
     this.isPlayer = isPlayer;
 
@@ -48,11 +48,11 @@ export class Actor {
     this.character.root.visible = !isPlayer;
 
     // inventory ---------------------------------------------------------
-    this.slots = { 1: null, 2: 'classic', 3: 'knife' };
+    this.slots = { 1: null, 2: 'glock', 3: 'knife' };
     this.currentSlot = 2;
     this.ammo = {};
-    this.ammo.classic = { mag: WEAPONS.classic.mag, reserve: WEAPONS.classic.reserve };
-    this.character.setWeapon('classic');
+    this.ammo.glock = { mag: WEAPONS.glock.mag, reserve: WEAPONS.glock.reserve };
+    this.character.setWeapon('glock');
     this.fireCooldown = 0;
     this.reloadTimer = 0;
     this.reloadDuration = 0;
@@ -144,7 +144,7 @@ export class Actor {
   giveWeapon(id) {
     const w = getWeapon(id);
     if (w.type === 'MELEE') return;
-    if (w.price >= 2600 || id === 'operator' || id === 'odin') {
+    if (w.price >= 2600 || id === 'awp' || id === 'awp') {
       this.slots[1] = id;
       this.currentSlot = 1;
     } else {
@@ -295,7 +295,7 @@ export class Actor {
   /* ---------------------------------------------------------------- */
   /* damage                                                            */
   /* ---------------------------------------------------------------- */
-  takeDamage(amount, { attacker = null, weaponId = 'classic', headshot = false, point = null } = {}) {
+  takeDamage(amount, { attacker = null, weaponId = 'glock', headshot = false, point = null } = {}) {
     if (!this.alive || this.game.phase === 'matchEnd') return;
     let dmg = amount;
     if (this.armor > 0) {

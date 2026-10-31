@@ -1,5 +1,5 @@
 /* ============================================================
-   COUNTER VALORANT — UI
+   COUNTER-STRIKE: BROWSER OPS — UI
    Fan project. Custom CSS, no external fonts required.
    ============================================================ */
 :root {
@@ -647,3 +647,7 @@ input[type="checkbox"] { accent-color: var(--red); }
 .map-card.active .map-tag::after {
   content: 'SEÇİLİ'; margin-left: 8px; font-size: 8px; letter-spacing: .18em; color: var(--teal);
 }
+
+/* real CS:GO finish cards use the item's rarity colour */
+.skin-card { border-left: 2px solid var(--rarity, rgba(236,232,222,.2)); }
+.skin-card .skin-name small { color: var(--rarity, #7e93a2); }

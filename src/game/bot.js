@@ -13,7 +13,7 @@ const SKILLS = {
 let botUid = 0;
 
 export class Bot extends Actor {
-  constructor(game, { team = 'enemy', agentId = 'blaze', name = 'BOT', difficulty = 'normal' } = {}) {
+  constructor(game, { team = 'enemy', agentId = 'phoenix', name = 'BOT', difficulty = 'normal' } = {}) {
     super(game, { team, agentId, name, isPlayer: false });
     this.isBot = true;
     this.skill = SKILLS[difficulty] || SKILLS.normal;
@@ -625,7 +625,7 @@ export class Bot extends Actor {
       } else if (has('recon') && !enemy && Math.random() < 0.25) {
         this.useAbility('recon');
       }
-    } else if (agent === 'blaze') {
+    } else if (agent === 'phoenix') {
       if (has('flash') && enemy && distance2D(this.pos, enemy.pos) > 6 && Math.random() < 0.5) {
         this.useAbility('flash', new THREE.Vector3(enemy.pos.x, 1.2, enemy.pos.z));
       } else if (has('firewall') && Math.random() < 0.25) {
@@ -672,22 +672,19 @@ export class Bot extends Actor {
 
   /* -------------------------------------------------------------- */
   autoBuy(roundNumber) {
-    const game = this.game;
     const cred = this.credits;
-    const loadout = this.agent.loadout || { primary: 'vandal', secondary: 'ghost' };
+    const loadout = this.agent.loadout || { primary: 'ak47', secondary: 'usp_s' };
     let primary = null;
 
-    const cheap = cred < 2000;
-    if (cheap) {
-      if (cred >= 1800 && Math.random() < 0.5) primary = 'spectre';
-      else if (cred >= 1400) primary = 'judge';
-    } else {
-      const roll = Math.random();
-      if (cred >= 4700 && roll < 0.18) primary = 'operator';
-      else if (cred >= 2900) primary = roll < 0.5 ? loadout.primary : (Math.random() < 0.5 ? 'vandal' : 'phantom');
-      else if (cred >= 2100) primary = roll < 0.6 ? 'bulldog' : 'spectre';
-      else if (cred >= 1600) primary = 'spectre';
-    }
+    // Counter-Strike economy: full buy when the money is there, eco otherwise
+    const roll = Math.random();
+    if (cred >= 4750 && roll < 0.16) primary = 'awp';
+    else if (cred >= 3100) primary = roll < 0.5 ? loadout.primary : (Math.random() < 0.5 ? 'ak47' : 'm4a4');
+    else if (cred >= 2700) primary = roll < 0.55 ? 'ak47' : 'mp9';
+    else if (cred >= 1700) primary = roll < 0.5 ? 'ssg08' : 'mp9';
+    else if (cred >= 1250) primary = 'mp9';
+    else if (cred >= 1050) primary = 'mac10';
+
     if (primary && getWeapon(primary).price <= cred) {
       this.credits -= getWeapon(primary).price;
       this.giveWeapon(primary);

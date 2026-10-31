@@ -100,7 +100,7 @@ if (degenerate.size) problems.push(`degenerate geometry: ${[...degenerate].join(
     const ok = applySkinDecal(probeModel, { name: 'TEST', uuid: '__test__' });
     if (!ok) {
       // texture cache has no entry → emulate by patching the model directly
-      const { WEAPON_SKINS } = await import('../src/game/valoAssets.js');
+      const { WEAPON_SKINS } = await import('../src/game/csgoAssets.js');
       const real = WEAPON_SKINS.vandal?.[0];
       if (real) {
         // prime the cache: monkeypatch loadImage is overkill, so just assert the API shape

@@ -1,8 +1,8 @@
 import { AGENT_LIST, AGENTS, agentPortraitSVG } from '../game/agents.js';
 import {
-  MAP_ART, WEAPON_SKINS, agentArtUrl, mapArtUrl, skinIconUrl, loadImagePlain, detectCdn,
-} from '../game/valoAssets.js';
-import { THEMES } from '../world/mapLayout.js';
+  MAP_ART, WEAPON_SKINS, skinImageUrl, loadImagePlain, detectCdn,
+} from '../game/csgoAssets.js';
+import { THEMES, MAPS, MAP_BY_ID, CURRENT_MAP, applyMap, worldToRadar } from '../world/mapLayout.js';
 import { BUY_ORDER, WEAPONS, weaponIconSVG } from '../game/weapons.js';
 import { WALLS, PROPS, SITES, SPAWNS, MAP_BOUNDS } from '../world/mapLayout.js';
 import { WeaponPreview } from './weaponPreview.js';
@@ -23,7 +23,8 @@ const DEFAULT_SETTINGS = {
   chGap: 6,
   chLen: 7,
   chDot: true,
-  agentId: 'blaze',
+  agentId: 'phoenix',
+  map: 'de_dust2',
   botDifficulty: 'normal',
   theme: 'dune',
   skins: {},
@@ -35,7 +36,7 @@ export class UI {
     this.onExitToMenu = onExitToMenu;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, settings || {});
     this.game = null;
-    this.selectedAgent = this.settings.agentId || 'blaze';
+    this.selectedAgent = this.settings.agentId || 'phoenix';
     this.agentCardEls = new Map();
     this.killfeedEntries = [];
     this.hudAcc = 0;
@@ -48,7 +49,7 @@ export class UI {
     this.damageLevel = 0;
     this.blurLevel = 0;
     this.pausedScreen = false;
-    this.vaultWeapon = 'vandal';
+    this.vaultWeapon = 'ak47';
     this.menuSlide = 0;
     this.menuSlideTimer = null;
     this.cdn = 'unknown';
@@ -247,10 +248,7 @@ export class UI {
   showAgentDetail(agentId) {
     const agent = AGENTS[agentId];
     if (!agent) return;
-    const artUrl = agentArtUrl(this.artKey(agentId), 'fullportrait');
-    this.el.adArt.innerHTML = artUrl
-      ? `<img src="${artUrl}" alt="${agent.name}" onerror="this.style.display='none'" />`
-      : agentPortraitSVG(agentId, { name: false });
+    this.el.adArt.innerHTML = agentPortraitSVG(agentId, 260);
     this.el.adRole.textContent = agent.role;
     this.el.adName.textContent = agent.name;
     this.el.adDesc.textContent = agent.desc;
@@ -272,7 +270,9 @@ export class UI {
     this.el.mainMenu.classList.add('hidden');
     this.el.agentSelect.classList.remove('hidden');
     this.showAgentDetail(this.selectedAgent);
-    this.el.asSide.innerHTML = `TAKIM: <b>SALDIRI</b> · HARİTA: <b>DUNE</b>`;
+    const map = MAP_BY_ID[this.settings.map] || MAPS[0];
+    const side = (AGENTS[this.selectedAgent]?.team === 'CT') ? 'CT' : 'T';
+    this.el.asSide.innerHTML = `TARAF: <b>${side}</b> · HARİTA: <b>${map.name}</b>`;
   }
 
   /* ================================================================ */
@@ -347,7 +347,7 @@ export class UI {
     set('#set-ch-gap', this.settings.chGap); out('#out-ch-gap', this.settings.chGap);
     set('#set-ch-len', this.settings.chLen); out('#out-ch-len', this.settings.chLen);
     $('#set-ch-dot').checked = this.settings.chDot;
-    this.selectedAgent = this.settings.agentId || 'blaze';
+    this.selectedAgent = this.settings.agentId || 'phoenix';
   }
 
   load() {
@@ -355,6 +355,11 @@ export class UI {
       const raw = localStorage.getItem('cv-settings-v1');
       if (raw) Object.assign(this.settings, JSON.parse(raw));
     } catch { /* ignore */ }
+    // settings saved by an older build may point at content that no longer exists
+    if (!AGENTS[this.settings.agentId]) this.settings.agentId = 'phoenix';
+    if (!MAPS.some((m) => m.id === this.settings.map)) this.settings.map = MAPS[0].id;
+    if (!this.settings.skins || typeof this.settings.skins !== 'object') this.settings.skins = {};
+    this.selectedAgent = this.settings.agentId;
   }
 
   save() {
@@ -490,8 +495,8 @@ export class UI {
     if (this.el.weaponSkin) {
       const skins = WEAPON_SKINS[w.id] || [];
       const eq = (this.settings.skins || {})[w.id];
-      const skin = eq === 'none' ? null : (skins.find((s) => s.uuid === eq) || skins[0] || null);
-      this.el.weaponSkin.textContent = skin ? skin.name.toUpperCase() : '';
+      const skin = eq === 'none' ? null : (skins.find((s) => (s.id || s.uuid) === eq) || skins[0] || null);
+        this.el.weaponSkin.textContent = skin ? skin.full.toUpperCase() : '';
       this.el.weaponSkin.style.opacity = skin ? '1' : '0';
     }
     if (w.type === 'MELEE') {
@@ -776,35 +781,51 @@ export class UI {
   initMinimap() {
     const c = this.el.minimap;
     if (!c) return;
-    this.mapScale = c.width / (MAP_BOUNDS.maxX - MAP_BOUNDS.minX);
+    this.mapScale = 3;
+    this._radarImg = null;
+    this._radarFor = null;
+    this._loadRadar();
+  }
+
+  /** the radar of the selected map, cached across frames */
+  _loadRadar() {
+    const map = CURRENT_MAP;
+    if (this._radarFor === map.id && this._radarImg) return this._radarImg;
+    this._radarFor = map.id;
+    const img = new Image();
+    img.src = map.radar;
+    this._radarImg = img;
+    return img;
   }
 
   drawMinimap(game) {
     const ctx = this.mm;
     const c = this.el.minimap;
     if (!ctx) return;
-    const S = this.mapScale;
-    const toX = (x) => (x - MAP_BOUNDS.minX) * S;
-    const toY = (z) => (z - MAP_BOUNDS.minZ) * S;
+    const map = CURRENT_MAP;
     const W = c.width;
+    const K = W / 1024;                       // radar pixels → canvas pixels
+    const pxOf = (x, z) => worldToRadar(map, x, z);
+    const toX = (x) => pxOf(x, 0).px * K;
+    const toY = (z) => pxOf(0, z).py * K;
+    const S = K / (map.meta.scale * 0.0254);  // canvas px per metre
+    this.mapScale = S;
 
     ctx.clearRect(0, 0, W, W);
-    ctx.fillStyle = 'rgba(10,18,24,0.92)';
+    ctx.fillStyle = '#0b1218';
     ctx.fillRect(0, 0, W, W);
 
-    // buildable floors hint
-    ctx.fillStyle = 'rgba(236,232,222,0.07)';
-    ctx.fillRect(toX(-31), toY(-31), (62) * S, 62 * S);
-
-    // walls
-    for (const [x, z, w, d] of WALLS) {
-      ctx.fillStyle = 'rgba(200,210,216,0.42)';
-      ctx.fillRect(toX(x - w / 2), toY(z - d / 2), Math.max(1.5, w * S), Math.max(1.5, d * S));
-    }
-    // props
-    for (const [x, z, w, d] of PROPS) {
-      ctx.fillStyle = 'rgba(160,175,185,0.22)';
-      ctx.fillRect(toX(x - w / 2), toY(z - d / 2), Math.max(1, w * S), Math.max(1, d * S));
+    const img = this._loadRadar();
+    if (img && img.complete && img.naturalWidth) {
+      ctx.globalAlpha = 0.92;
+      ctx.drawImage(img, 0, 0, W, W);
+      ctx.globalAlpha = 1;
+    } else {
+      // radar still downloading: sketch the collision boxes so the HUD is useful
+      for (const [x, z, w, d] of WALLS) {
+        ctx.fillStyle = 'rgba(190,200,210,0.35)';
+        ctx.fillRect(toX(x - w / 2), toY(z - d / 2), Math.max(1, w * S), Math.max(1, d * S));
+      }
     }
 
     // sites
@@ -824,15 +845,15 @@ export class UI {
       ctx.fillText(key, toX(site.center.x), toY(site.center.z));
     }
 
-    // spawns
+    // spawn zones
     const spawnTeam = game.attackingTeam;
-    ctx.fillStyle = spawnTeam === game.player.team ? 'rgba(255,140,80,0.2)' : 'rgba(80,160,255,0.18)';
+    ctx.fillStyle = spawnTeam === game.player.team ? 'rgba(255,140,80,0.22)' : 'rgba(80,160,255,0.2)';
     ctx.beginPath();
-    ctx.arc(toX(SPAWNS.attacker[0].x), toY(SPAWNS.attacker[0].z), 3.6 * S, 0, Math.PI * 2);
+    ctx.arc(toX(SPAWNS.attacker[0].x), toY(SPAWNS.attacker[0].z), 3.6 * Math.max(S, 1.2), 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = spawnTeam === game.player.team ? 'rgba(120,200,255,0.2)' : 'rgba(255,120,120,0.18)';
+    ctx.fillStyle = spawnTeam === game.player.team ? 'rgba(120,200,255,0.22)' : 'rgba(255,120,120,0.2)';
     ctx.beginPath();
-    ctx.arc(toX(SPAWNS.defender[0].x), toY(SPAWNS.defender[0].z), 3.6 * S, 0, Math.PI * 2);
+    ctx.arc(toX(SPAWNS.defender[0].x), toY(SPAWNS.defender[0].z), 3.6 * Math.max(S, 1.2), 0, Math.PI * 2);
     ctx.fill();
 
     // smoke clouds
@@ -998,7 +1019,7 @@ export class UI {
 
   renderScoreboard(data) {
     this.el.sbScore.textContent = `${data.allyScore} — ${data.enemyScore}`;
-    const head = `<div class="sb-row head"><span>AJAN / OYUNCU</span><span>K</span><span>Ö</span><span>HASAR</span><span>KREDİ</span></div>`;
+    const head = `<div class="sb-row head"><span>OPERATÖR / OYUNCU</span><span>K</span><span>Ö</span><span>HASAR</span><span>KREDİ</span></div>`;
     const team = (rows, cls) => head + rows.map((r) => `
       <div class="sb-row ${cls} ${r.me ? 'me' : ''} ${r.alive ? '' : 'dead'}">
         <span class="sb-name"><i class="sb-dot"></i>${r.agent} · ${r.name}</span>
@@ -1039,10 +1060,10 @@ export class UI {
   }
 
   /* ================================================================ */
-  /* AUTHENTIC VALORANT ART                                            */
+  /* AUTHENTIC COUNTER-STRIKE ART                                      */
   /* ================================================================ */
   _initAuthenticArt() {
-    this.agentArtKeys = { blaze: 'phoenix', veil: 'omen', pulse: 'sova', oath: 'sage' };
+    this.agentArtKeys = {};
 
     // buttons
     this.el.btnSkins?.addEventListener('click', () => { audio.play('ui_click'); this.showSkinVault(true); });
@@ -1063,7 +1084,7 @@ export class UI {
       this.cdn = state;
       if (this.el.vaultStatus) {
         this.el.vaultStatus.textContent = state === 'online'
-          ? 'orijinal kaplamalar · valorant-api'
+          ? 'orijinal kaplamalar · valve cdn'
           : 'çevrimdışı — kaplama görselleri yüklenemedi';
         this.el.vaultStatus.classList.toggle('online', state === 'online');
         this.el.vaultStatus.classList.toggle('offline', state !== 'online');
@@ -1086,10 +1107,7 @@ export class UI {
 
   /** real portrait <img> for an agent card / detail panel */
   agentArtHTML(agentId, cls = 'ac-art') {
-    const url = agentArtUrl(this.artKey(agentId), 'fullportrait');
-    if (!url) return agentPortraitSVG(agentId, { name: false });
-    return `<img class="${cls}" src="${url}" alt="" loading="lazy"
-      onerror="this.style.display='none'" />`;
+    return `<div class="${cls}">${agentPortraitSVG(agentId, 180)}</div>`;
   }
 
   /** weapon skin render (falls back to the procedural SVG icon) */
@@ -1097,8 +1115,8 @@ export class UI {
     const skinMap = this.settings.skins || {};
     const listed = WEAPON_SKINS[weaponId] || [];
     if (!listed.length) return null;
-    const chosen = listed.find((s) => s.uuid === skinMap[weaponId]) || listed[0];
-    return skinIconUrl(chosen.uuid);
+    const chosen = listed.find((s) => (s.id || s.uuid) === skinMap[weaponId]) || listed[0];
+    return skinImageUrl(chosen);
   }
 
   _buildWeaponArt() {
@@ -1109,13 +1127,12 @@ export class UI {
 
   /* ---------------- hero / slideshow art ---------------- */
   _pickHeroArt() {
-    const maps = MAP_ART.filter((m) => m.uuid);
-    const pick = maps[Math.floor(Math.random() * maps.length)] || MAP_ART[0];
+    const pick = MAP_BY_ID[this.settings.map] || MAPS[0];
     this.setHeroArt(pick, { credits: true });
   }
 
   setHeroArt(map, { credits = false } = {}) {
-    const url = mapArtUrl(map.uuid, 'splash');
+    const url = map.radar;
     if (this.el.menuArt) {
       this.el.menuArt.classList.add('swap');
       loadImagePlain(url).then((img) => {
@@ -1129,25 +1146,25 @@ export class UI {
     if (credits && !this._artCredit && this.el.mainMenu) {
       const tag = document.createElement('div');
       tag.className = 'menu-art-credit';
-      tag.textContent = `${map.name} — VALORANT HARİTASI`;
+      tag.textContent = `${map.name} — resmî CS2 radarı`;
       this.el.mainMenu.appendChild(tag);
       this._artCredit = tag;
     } else if (this._artCredit) {
-      this._artCredit.textContent = `${map.name} — VALORANT HARİTASI`;
+      this._artCredit.textContent = `${map.name} — resmî CS2 radarı`;
     }
   }
 
   setMenuThemeLabel() {
-    const theme = THEMES[this.settings.theme || 'dune'] || THEMES.dune;
+    const map = MAP_BY_ID[this.settings.map] || MAPS[0];
     const label = document.querySelector('#as-side b');
-    if (label) label.textContent = theme.label;
+    if (label) label.textContent = map.name;
     const foot = document.querySelector('.as-map b');
-    if (foot) foot.textContent = theme.label;
+    if (foot) foot.textContent = map.name;
   }
 
   _startMenuSlideshow() {
     clearInterval(this.menuSlideTimer);
-    const maps = MAP_ART.filter((m) => m.uuid);
+    const maps = MAPS;
     if (!maps.length) return;
     this.menuSlideTimer = setInterval(() => {
       if (!this.el.mainMenu || this.el.mainMenu.classList.contains('hidden')) return;
@@ -1193,16 +1210,16 @@ export class UI {
     const weaponId = this.vaultWeapon;
     const skins = WEAPON_SKINS[weaponId] || [];
     const equipped = (this.settings.skins || {})[weaponId];
-    const activeUuid = equipped === 'none' ? null : (equipped || skins[0]?.uuid);
-    const skin = skins.find((s) => s.uuid === activeUuid) || null;
+    const activeUuid = equipped === 'none' ? null : (equipped || skins[0]?.id);
+    const skin = skins.find((s) => s.id === activeUuid) || null;
     this.stage.setWeapon(weaponId, this.settings.skins || {});
     if (this.el.svStageWeapon) this.el.svStageWeapon.textContent = weaponId.toUpperCase();
-    if (this.el.svStageSkin) this.el.svStageSkin.textContent = skin ? skin.name : 'VARSAYILAN KAPLAMA';
+    if (this.el.svStageSkin) this.el.svStageSkin.textContent = skin ? skin.full : 'VARSAYILAN KAPLAMA';
   }
 
   renderVaultWeapons() {
     if (!this.el.svWeapons) return;
-    const order = ['vandal', 'phantom', 'operator', 'sheriff', 'ghost', 'spectre', 'judge', 'bulldog', 'odin', 'classic'];
+    const order = ['ak47', 'm4a4', 'awp', 'ssg08', 'deagle', 'usp_s', 'glock', 'p250', 'mp9', 'mac10', 'knife'];
     this.el.svWeapons.innerHTML = order.map((id) => {
       const count = (WEAPON_SKINS[id] || []).length;
       return `<button class="vault-wpn ${id === this.vaultWeapon ? 'active' : ''}" data-wpn="${id}">
@@ -1224,21 +1241,22 @@ export class UI {
     if (!this.el.svSkins) return;
     const skins = WEAPON_SKINS[weaponId] || [];
     const equipped = (this.settings.skins || {})[weaponId];
-    const activeUuid = equipped === 'none' ? null : (equipped || skins[0]?.uuid);
+    const activeUuid = equipped === 'none' ? null : (equipped || skins[0]?.id);
     this.el.svSkins.innerHTML = skins.map((skin) => {
-      const isOn = skin.uuid === activeUuid;
-      return `<button class="skin-card ${isOn ? 'equipped' : ''}" data-skin="${skin.uuid}">
+      const isOn = skin.id === activeUuid;
+      return `<button class="skin-card ${isOn ? 'equipped' : ''}" data-skin="${skin.id}" style="--rarity:${skin.color}">
         <div class="skin-badge">KUŞANILDI</div>
         <div class="skin-art skin-loading">${weaponIconSVG(weaponId)}</div>
-        <div class="skin-name">${skin.name.toUpperCase()}<small>${weaponId.toUpperCase()} · VALORANT</small></div>
+        <div class="skin-name">${skin.full.toUpperCase()}<small>${skin.rarity.toUpperCase()}</small></div>
       </button>`;
     }).join('');
 
-    // fill in the real renders asynchronously, keeping the placeholder on failure
+    // fill in Valve's real renders, keeping the painted placeholder on failure
     this.el.svSkins.querySelectorAll('.skin-card').forEach((card) => {
-      const uuid = card.dataset.skin;
+      const id = card.dataset.skin;
       const slot = card.querySelector('.skin-art');
-      loadImagePlain(skinIconUrl(uuid)).then((img) => {
+      const skin = skins.find((s) => s.id === id);
+      loadImagePlain(skinImageUrl(skin)).then((img) => {
         if (!img || !slot.isConnected) return;
         slot.classList.remove('skin-loading');
         slot.innerHTML = `<img src="${img.src}" alt="" />`;
@@ -1246,11 +1264,11 @@ export class UI {
       card.addEventListener('click', () => {
         audio.play('ui_click');
         if (!this.settings.skins) this.settings.skins = {};
-        this.settings.skins[weaponId] = uuid;
+        this.settings.skins[weaponId] = id;
         this.save();
         if (this.el.svHint) {
-          const skin = skins.find((s) => s.uuid === uuid);
-          this.el.svHint.textContent = `${skin?.name || 'Kaplama'} kuşanıldı — maçta ${weaponId.toUpperCase()} aldığında uygulanır.`;
+          const picked = skins.find((s) => s.id === id);
+          this.el.svHint.textContent = `${picked?.full || 'Kaplama'} kuşanıldı — ${weaponId.toUpperCase()} elinde olduğunda görünür.`;
         }
         this.renderVaultSkins(weaponId);
         this._refreshStage();
@@ -1267,37 +1285,32 @@ export class UI {
 
   renderMaps() {
     if (!this.el.mapsGrid) return;
-    const activeTheme = this.settings.theme || 'dune';
+    const activeId = this.settings.map || MAPS[0].id;
     this.el.mapsGrid.innerHTML = MAP_ART.map((m) => `
-      <div class="map-card ${m.theme === activeTheme ? 'active' : ''}" data-theme="${m.theme || 'dune'}" title="Bu tema ile oyna">
+      <div class="map-card ${m.id === activeId ? 'active' : ''}" data-mapid="${m.id}" title="${m.name} haritasında oyna">
         <div class="map-fallback">${m.name}</div>
-        <img data-map="${m.uuid}" alt="${m.name}" style="opacity:0" />
-        <div class="map-tag">${m.name}<small>${m.desc}</small></div>
+        <img src="${m.radar}" alt="${m.name}" loading="lazy" />
+        <div class="map-tag">${m.name}<small>${m.desc} · ${m.sites.A.center.x.toFixed(0)},${m.sites.A.center.z.toFixed(0)}</small></div>
       </div>`).join('');
 
-    // clicking a real map switches the arena palette and starts the match flow
-    this.el.mapsGrid.querySelectorAll('[data-theme]').forEach((card) => {
+    this.el.mapsGrid.querySelectorAll('[data-mapid]').forEach((card) => {
       card.addEventListener('click', () => {
-        const theme = card.dataset.theme;
-        if (!THEMES[theme]) return;
-        this.settings.theme = theme;
+        const id = card.dataset.mapid;
+        if (!MAP_BY_ID[id]) return;
+        this.settings.map = id;
         this.save();
+        applyMap(id);
         audio.play('ui_click');
         this.showMapsGallery(false);
-        this.toast(`<b>${THEMES[theme].label}</b> teması seçildi — sonraki maçta uygulanır`, 2.6);
+        this.toast(`<b>${MAP_BY_ID[id].name}</b> seçildi — maç bu haritada oynanacak`, 2.6);
+        this._pickHeroArt();
         this.setMenuThemeLabel();
-      });
-    });
-    this.el.mapsGrid.querySelectorAll('img[data-map]').forEach((img) => {
-      loadImagePlain(mapArtUrl(img.dataset.map, 'list')).then((res) => {
-        if (!res || !img.isConnected) return;
-        img.src = res.src;
-        img.style.opacity = '1';
+        this.renderMaps();
       });
     });
   }
 
-  /** buy menu thumbnail: real Valorant render, SVG fallback if the CDN is down */
+  /** buy menu thumbnail: real CS finish render, SVG fallback if the CDN is down */
   buyWeaponArt(weaponId) {
     const url = this.weaponArtURL(weaponId);
     if (!url) return weaponIconSVG(weaponId);
@@ -1318,8 +1331,7 @@ export class UI {
   /** HUD portrait: the agent's real bust instead of the placeholder block */
   setHudPortrait(agentId) {
     if (!this.el.portraitMini) return;
-    const url = agentArtUrl(this.artKey(agentId), 'bust') || agentArtUrl(this.artKey(agentId), 'icon');
-    this.el.portraitMini.innerHTML = url ? `<img src="${url}" alt="" onerror="this.remove()" />` : '';
+    this.el.portraitMini.innerHTML = agentPortraitSVG(agentId, 64);
   }
 }
 

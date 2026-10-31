@@ -9,7 +9,7 @@ import { getWeapon, WEAPONS } from './weapons.js';
 import { AGENTS, AGENT_LIST } from './agents.js';
 import { audio } from '../core/audio.js';
 import { clamp, rand, choice, shuffle, rayBoxes, boxFromCenter, resolveCircleBoxXZ, distance2D, angleDiff } from '../core/utils.js';
-import { PLANT_SPOTS, HOLD_SPOTS, SPAWNS, SITES, MAP_BOUNDS, ATTACK_PATHS } from '../world/mapLayout.js';
+import { PLANT_SPOTS, HOLD_SPOTS, SPAWNS, SITES, MAP_BOUNDS, ATTACK_PATHS, CURRENT_MAP } from '../world/mapLayout.js';
 
 const BUY_TIME = 20;
 const LIVE_TIME = 100;
@@ -22,14 +22,14 @@ const ROUNDS_TO_WIN = 5;
 const PHASE_LABEL = {
   buy: 'SATIN ALMA',
   live: 'TUR BAŞLADI',
-  planted: 'SPIKE KURULU',
+  planted: 'BOMBA KURULU',
   roundEnd: 'TUR SONU',
   matchEnd: 'MAÇ SONU',
   freeze: 'HAZIRLAN',
 };
 
 export class Game {
-  constructor({ canvas, ui, settings = {}, agentId = 'blaze', onExit, headless = false }) {
+  constructor({ canvas, ui, settings = {}, agentId = 'phoenix', onExit, headless = false }) {
     this.headless = headless;
     this.canvas = canvas;
     this.ui = ui;
@@ -120,7 +120,7 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(this.settings.fov || 90, aspect, 0.05, 420);
     this.camera.rotation.order = 'YXZ';
 
-    this.map = new GameMap(this.scene, quality, this.settings.theme || 'dune');
+    this.map = new GameMap(this.scene, quality, this.settings.map || 'de_dust2');
     this.effects = new Effects(this.scene, quality);
     this.viewmodel = new Viewmodel(renderer, quality);
 
@@ -169,12 +169,12 @@ export class Game {
     this.roundNumber = 0;
     this.startRound(true);
 
-    this.ui.setMapName?.(this.map.theme?.label || 'DUNE');
+    this.ui.setMapName?.(this.map.map?.name || 'DUST II');
     return this;
   }
 
   _buildSpikeVisual() {
-    // Valorant-style spike: dark plated housing, three folding prongs and a
+    // C4 charge: plated housing, folding prongs and a
     // glowing core that pulses faster as the timer runs down.
     const g = new THREE.Group();
     const shellMat = new THREE.MeshStandardMaterial({ color: 0x1d2329, metalness: 0.85, roughness: 0.34 });
@@ -582,7 +582,7 @@ export class Game {
       this.player.abilityState[ab.id].cooldown = 0;
     }
 
-    // reset actor inventories that were lost? weapons persist like Valorant
+    // weapons persist across rounds, only the C4 changes hands
     this.player.currentSlot = this.player.slots[1] ? 1 : 2;
     this.player.character.setWeapon(this.player.slots[this.player.currentSlot], this.settings.skins);
     this.player.syncViewmodel();
@@ -622,7 +622,7 @@ export class Game {
     this.spawnBarrierActive = false;
     for (const b of this.barriers) b.mesh.visible = false;
     this.ui.setHUDPhase('live');
-    this.ui.banner('BAŞLA', this.attackingTeam === 'ally' ? 'SPIKE\'I KUR' : 'SPIKE\'I ENGELLE', 1.6);
+    this.ui.banner('BAŞLA', this.attackingTeam === 'ally' ? 'C4\'Ü KUR' : 'BOMBA ALANINI TUT', 1.6);
     this.ui.event(`PLAN: ${this.attackSite} BÖLGESİ`, 3);
     if (this.buyMenuOpen) this.toggleBuyMenu(false);
     audio.play('round_start', { volume: 0.65 });
@@ -646,7 +646,7 @@ export class Game {
     this.spikeMesh.visible = true;
     this.spikeMesh.position.set(spot.x, 0.02, spot.z);
     this.ui.setHUDPhase('planted');
-    this.ui.banner('SPIKE KURULDU', actor.name + ' · 45 SANİYE', 2.4);
+    this.ui.banner('BOMBA KURULDU', actor.name + ' · 45 SANİYE', 2.4);
     this.ui.event(`${actor.name} spike'ı ${this.spike.site} bölgesine kurdu`, 4);
     audio.play('spike_planted', { volume: 0.9 });
     this.effects.reconRing(this.spike.pos.clone(), 5);
@@ -701,9 +701,9 @@ export class Game {
 
     // economy
     for (const a of this.actors) {
-      if (a.team === winnerTeam) a.credits += 3000;
-      else a.credits += 1900;
-      a.credits = Math.min(a.credits, 9000);
+      if (a.team === winnerTeam) a.credits += 3250;
+      else a.credits += 1400;
+      a.credits = Math.min(a.credits, 16000);
       if (a.team === winnerTeam) a.addUltPoints(1);
     }
     this.ui.setCredits(this.player.credits);
@@ -719,8 +719,8 @@ export class Game {
     switch (reason) {
       case 'eliminate': return 'TÜM RAKİPLER ELİMİNE EDİLDİ';
       case 'time': return 'SÜRE DOLDU';
-      case 'explode': return 'SPIKE PATLADI';
-      case 'defuse': return 'SPIKE ÇÖZÜLDÜ';
+      case 'explode': return 'BOMBA PATLADI';
+      case 'defuse': return 'BOMBA ÇÖZÜLDÜ';
       default: return '';
     }
   }
@@ -988,7 +988,7 @@ export class Game {
   onKill(victim, attacker, weaponId, headshot) {
     const weapon = getWeapon(weaponId);
     const feedEntry = {
-      attacker: attacker ? attacker.name : 'SPIKE',
+      attacker: attacker ? attacker.name : 'C4',
       attackerTeam: attacker ? attacker.team : null,
       victim: victim.name,
       victimTeam: victim.team,
@@ -1003,7 +1003,7 @@ export class Game {
     if (attacker && attacker !== victim) {
       attacker.kills++;
       attacker.roundKills++;
-      attacker.credits = Math.min(9000, attacker.credits + 200);
+      attacker.credits = Math.min(16000, attacker.credits + 300);
       attacker.addUltPoints(1);
       if (attacker.isPlayer) {
         this.ui.setCredits(this.player.credits);
@@ -1027,7 +1027,7 @@ export class Game {
       this.spike.dropTime = this.time;
       this.spikeMesh.visible = true;
       this.spikeMesh.position.set(victim.pos.x, 0.02, victim.pos.z);
-      this.ui.event('SPIKE DÜŞTÜ', 2.5);
+      this.ui.event('BOMBA DÜŞTÜ', 2.5);
     }
 
     if (attacker && attacker.isPlayer && victim.isPlayer) {
@@ -1388,7 +1388,7 @@ export class Game {
         if (this.spike.plantProgress === 0) this.ui.interactHint('[F] SPIKE\'I KUR');
         return;
       } else {
-        this.ui.interactHint('SPIKE\'I KURMAK İÇİN BÖLGEYE GİT');
+        this.ui.interactHint('C4\'Ü KURMAK İÇİN BÖLGEYE GİT');
       }
       this.updatePlantProgressUI(null);
     } else {
@@ -1760,8 +1760,8 @@ export class Game {
       p.credits -= 1000;
       p.armor = 100;
     } else {
-      if (p.credits < 400 || p.armor >= 50) return false;
-      p.credits -= 400;
+      if (p.credits < 650 || p.armor >= 50) return false;
+      p.credits -= 650;
       p.armor = 50;
     }
     audio.play('buy', { volume: 0.6 });
@@ -1822,8 +1822,8 @@ export class Game {
       a.deaths = 0;
       a.damageDealt = 0;
       a.armor = 0;
-      a.slots = { 1: null, 2: 'classic', 3: 'knife' };
-      a.ammo = { classic: { mag: WEAPONS.classic.mag, reserve: WEAPONS.classic.reserve } };
+      a.slots = { 1: null, 2: 'glock', 3: 'knife' };
+      a.ammo = { glock: { mag: WEAPONS.glock.mag, reserve: WEAPONS.glock.reserve } };
       a.currentSlot = 2;
       for (const ab of a.agent.abilities) {
         const st = a.abilityState[ab.id];
@@ -1831,7 +1831,7 @@ export class Game {
         st.ultPoints = 0;
         st.cooldown = 0;
       }
-      a.character.setWeapon('classic');
+      a.character.setWeapon('glock');
     }
     this.startRound();
     this.start();

@@ -1,386 +1,159 @@
 /**
- * DUNE — the tactical map layout.
+ * Map registry + live layout data for COUNTER-STRIKE: BROWSER OPS.
  *
- * Pure data (no three.js imports) so that it can be validated with node
- * scripts and reused by the AI navigation graph, the minimap and the 3D
- * builder.
+ * Every arena is generated from the official CS2 radar of the real map
+ * (see tools/buildmaps.mjs): the walkable mask becomes collision geometry and
+ * a navigation graph, so de_dust2's long, tunnels, catwalk and mid are where
+ * they are in the real thing.
  *
- * Coordinate system: X = east/west, Z = south/north (attackers spawn at +Z,
- * defenders at -Z). Walls are axis aligned boxes: [x, z, width, depth, height].
- *
- * Layout overview
- *   ┌────────────────────────────────────────────────┐
- *   │ [ B SITE ]      [ DEF SPAWN ]      [ A SITE ]  │
- *   │      │   CT  │         │   CT  │         │      │
- *   │  ────┴───────┴──[MID]──┴───────┴───────┴────  │  z=-12
- *   │  [B MAIN]   [B CONN]  [MID]  [A CONN] [A MAIN] │
- *   │                                                │
- *   │            [   ATTACKER YARD   ]               │
- *   │              [ ATTACKER SPAWN ]                │
- *   └────────────────────────────────────────────────┘
+ * The exported arrays are mutated by applyMap() so every consumer (map builder,
+ * bots, UI, radar) always reads the currently selected arena.
  */
+import { decodeMask, buildWalls, buildNav, buildSpots, WALL_HEIGHT } from './gridLayout.js';
 
-export const MAP_BOUNDS = { minX: -33, maxX: 33, minZ: -33, maxZ: 33 };
-export const WALL_HEIGHT = 6;
+import de_dust2 from './maps/de_dust2.js';
+import de_mirage from './maps/de_mirage.js';
+import de_inferno from './maps/de_inferno.js';
+import de_nuke from './maps/de_nuke.js';
+import de_ancient from './maps/de_ancient.js';
+import de_anubis from './maps/de_anubis.js';
+import de_vertigo from './maps/de_vertigo.js';
+import de_train from './maps/de_train.js';
+
+export { WALL_HEIGHT };
 export const BOUND_WALL_HEIGHT = 9;
 
-/** [x, z, w, d, h, kind] */
-export const WALLS = [
-  // ---------- perimeter ----------
-  [0, -33.6, 69, 1.2, BOUND_WALL_HEIGHT, 'perimeter'],
-  [0, 33.6, 69, 1.2, BOUND_WALL_HEIGHT, 'perimeter'],
-  [-33.6, 0, 1.2, 69, BOUND_WALL_HEIGHT, 'perimeter'],
-  [33.6, 0, 1.2, 69, BOUND_WALL_HEIGHT, 'perimeter'],
+/** The real map list, dust2 first. */
+export const MAPS = [de_dust2, de_mirage, de_inferno, de_nuke, de_ancient, de_anubis, de_vertigo, de_train];
+export const MAP_BY_ID = Object.fromEntries(MAPS.map((m) => [m.id, m]));
 
-  // ---------- defender spawn room (x -9..9, z -33..-24) ----------
-  [-9.6, -28.6, 1.2, 9.2, WALL_HEIGHT, 'concrete'],
-  [9.6, -28.6, 1.2, 9.2, WALL_HEIGHT, 'concrete'],
-  [-6.3, -24, 6.6, 1.2, WALL_HEIGHT, 'concrete'],
-  [6.3, -24, 6.6, 1.2, WALL_HEIGHT, 'concrete'],
-  [-9.6, -33, 6.6, 1.2, WALL_HEIGHT, 'concrete'], // closes SP top with perimeter
-  [9.6, -33, 6.6, 1.2, WALL_HEIGHT, 'concrete'],
-
-  // ---------- site A / CT dividing wall (x = 10) ----------
-  [10, -26, 1.2, 12, WALL_HEIGHT, 'concrete'],
-  [10, -14, 1.2, 4, WALL_HEIGHT, 'concrete'],
-  // ---------- site B / CT dividing wall (x = -10) ----------
-  [-10, -26, 1.2, 12, WALL_HEIGHT, 'concrete'],
-  [-10, -14, 1.2, 4, WALL_HEIGHT, 'concrete'],
-
-  // ---------- the long z = -12 wall (sites / lanes) ----------
-  [-29.5, -12, 5, 1.2, WALL_HEIGHT, 'concrete'], // -32 .. -27
-  [-19, -12, 6, 1.2, WALL_HEIGHT, 'concrete'],   // -22 .. -16
-  [-13, -12, 6, 1.2, WALL_HEIGHT, 'concrete'],   // -16 .. -10 (B site south)
-  [-6.5, -12, 7, 1.2, WALL_HEIGHT, 'concrete'],  // -10 .. -3
-  [6.5, -12, 7, 1.2, WALL_HEIGHT, 'concrete'],   // 3 .. 10
-  [13, -12, 6, 1.2, WALL_HEIGHT, 'concrete'],    // 10 .. 16
-  [19, -12, 6, 1.2, WALL_HEIGHT, 'concrete'],    // 16 .. 22
-  [29.5, -12, 5, 1.2, WALL_HEIGHT, 'concrete'],  // 27 .. 32
-
-  // ---------- A MAIN west wall (x = 20) with a gap at z -4..0 ----------
-  [20, -8, 1.2, 8, WALL_HEIGHT, 'concrete'],
-  [20, 7, 1.2, 14, WALL_HEIGHT, 'concrete'],
-  // ---------- B MAIN east wall (x = -20) ----------
-  [-20, -8, 1.2, 8, WALL_HEIGHT, 'concrete'],
-  [-20, 7, 1.2, 14, WALL_HEIGHT, 'concrete'],
-
-  // ---------- MID walls (x = ±8) with a window gap at z 0..6 ----------
-  [8, -6, 1.2, 12, WALL_HEIGHT, 'metal'],
-  [8, 10, 1.2, 8, WALL_HEIGHT, 'metal'],
-  [-8, -6, 1.2, 12, WALL_HEIGHT, 'metal'],
-  [-8, 10, 1.2, 8, WALL_HEIGHT, 'metal'],
-
-];
-
-/** Free-standing cover / props. [x, z, w, d, h, type, rotY?] */
-export const PROPS = [
-  // ---------------- attacker yard ----------------
-  [0, 24.5, 2.4, 2.4, 1.7, 'crate'],
-  [-4.2, 22.4, 1.4, 3.2, 1.05, 'sandbag'],
-  [4.2, 22.4, 1.4, 3.2, 1.05, 'sandbag'],
-  [-12, 18.5, 3.2, 2.2, 1.7, 'crate'],
-  [12, 18.5, 3.2, 2.2, 1.7, 'crate'],
-  [-24, 22, 7, 2.4, 2.6, 'container'],
-  [24, 22, 7, 2.4, 2.6, 'container'],
-  [-20.5, 26.5, 1.5, 1.5, 2.2, 'barrel'],
-  [20.5, 26.5, 1.5, 1.5, 2.2, 'barrel'],
-  [-29, 17, 2.6, 2.6, 1.7, 'crate'],
-  [29, 17, 2.6, 2.6, 1.7, 'crate'],
-
-  // ---------------- A main ----------------
-  [25.5, 9, 2.6, 2.6, 1.7, 'crate'],
-  [28.5, 3, 1.6, 5.2, 1.05, 'sandbag'],
-  [23.5, -2, 2.2, 2.2, 1.7, 'crate'],
-  [30.5, -6, 2.2, 2.2, 2.2, 'barrelStack'],
-  // ---------------- B main ----------------
-  [-25.5, 9, 2.6, 2.6, 1.7, 'crate'],
-  [-28.5, 3, 1.6, 5.2, 1.05, 'sandbag'],
-  [-23.5, -2, 2.2, 2.2, 1.7, 'crate'],
-  [-30.5, -6, 2.2, 2.2, 2.2, 'barrelStack'],
-
-  // ---------------- A connector ----------------
-  [14, 9.5, 2.8, 2.8, 1.7, 'crate'],
-  [12.5, 1.5, 2.2, 6, 1.05, 'sandbag'],
-  [17, -6.5, 3.4, 2.4, 1.7, 'crate'],
-  // ---------------- B connector ----------------
-  [-14, 9.5, 2.8, 2.8, 1.7, 'crate'],
-  [-12.5, 1.5, 2.2, 6, 1.05, 'sandbag'],
-  [-17, -6.5, 3.4, 2.4, 1.7, 'crate'],
-
-  // ---------------- mid ----------------
-  [-3.4, 5.5, 3.2, 1.2, 1.0, 'sandbag'],
-  [3.4, 5.5, 3.2, 1.2, 1.0, 'sandbag'],
-  [0, -1.5, 2.6, 2.6, 1.7, 'crate'],
-  [0, -5.5, 1.6, 4.4, 1.05, 'sandbag'],
-
-  // ---------------- CT ----------------
-  [-4.6, -14.5, 2.2, 2.2, 1.7, 'crate'],
-  [4.6, -14.5, 2.2, 2.2, 1.7, 'crate'],
-  [-2.3, -22.2, 2.4, 1.2, 1.05, 'sandbag'],
-  [2.3, -22.2, 2.4, 1.2, 1.05, 'sandbag'],
-
-  // ---------------- defender spawn ----------------
-  [-6, -29.5, 2.2, 1.6, 1.5, 'crate'],
-  [6, -29.5, 2.2, 1.6, 1.5, 'crate'],
-
-  // ---------------- SITE A ----------------
-  [14.5, -20.5, 1.6, 4.2, 1.05, 'sandbag'],
-  [17.5, -23.5, 2.4, 2.4, 1.7, 'crate'],
-  [21, -26.5, 3.2, 1.8, 1.7, 'crate'],
-  [25.5, -29, 4.2, 2.4, 1.7, 'crate'],
-  [29.5, -22, 2.6, 2.6, 2.2, 'barrelStack'],
-  [29.4, -17.5, 2.2, 2.2, 1.05, 'sandbag'],
-  [30.5, -27.5, 2.4, 4.2, 1.7, 'crate'],
-  [17, -29.5, 2.2, 2.2, 1.7, 'crate'],
-
-  // ---------------- SITE B (mirror) ----------------
-  [-14.5, -20.5, 1.6, 4.2, 1.05, 'sandbag'],
-  [-17.5, -23.5, 2.4, 2.4, 1.7, 'crate'],
-  [-21, -26.5, 3.2, 1.8, 1.7, 'crate'],
-  [-25.5, -29, 4.2, 2.4, 1.7, 'crate'],
-  [-29.5, -22, 2.6, 2.6, 2.2, 'barrelStack'],
-  [-29.4, -17.5, 2.2, 2.2, 1.05, 'sandbag'],
-  [-30.5, -27.5, 2.4, 4.2, 1.7, 'crate'],
-  [-17, -29.5, 2.2, 2.2, 1.7, 'crate'],
-
-  // decorative barrels near spawns
-  [-10.5, -30.5, 1.4, 1.4, 1.9, 'barrel'],
-  [10.5, -30.5, 1.4, 1.4, 1.9, 'barrel'],
-];
-
-/** Floor rectangles: [x, z, w, d, material] */
-export const FLOORS = [
-  [0, 0, 68, 68, 'ground'],
-  // site A raised tile border
-  [21, -22, 22, 20, 'tileA'],
-  [-21, -22, 22, 20, 'tileB'],
-  [0, -28.5, 18.4, 9.4, 'defspawn'],
-  [0, 27.5, 26, 11, 'atkspawn'],
-  [0, 1, 16, 26, 'midlane'],
-  [25.5, 1, 12, 26, 'laneA'],
-  [-25.5, 1, 12, 26, 'laneB'],
-  [14, 1, 12, 26, 'connA'],
-  [-14, 1, 12, 26, 'connB'],
-  [0, -18, 19.2, 12, 'ctfloor'],
-];
-
-export const SITES = {
-  A: { id: 'A', center: { x: 21, z: -22 }, radius: 8.5, label: 'A' },
-  B: { id: 'B', center: { x: -21, z: -22 }, radius: 8.5, label: 'B' },
-};
-
-/** Possible spike plant positions per site (must be inside the plant radius). */
-export const PLANT_SPOTS = {
-  A: [
-    { x: 20, z: -21 },
-    { x: 23.5, z: -25 },
-    { x: 17, z: -25.5 },
-    { x: 24, z: -18.5 },
-    { x: 27, z: -22.5 },
-  ],
-  B: [
-    { x: -20, z: -21 },
-    { x: -23.5, z: -25 },
-    { x: -17, z: -25.5 },
-    { x: -24, z: -18.5 },
-    { x: -27, z: -22.5 },
-  ],
-};
-
-export const SPAWNS = {
-  attacker: [
-    { x: -6, z: 28.5 }, { x: -2, z: 28.5 }, { x: 2, z: 28.5 }, { x: 6, z: 28.5 }, { x: 0, z: 30 },
-  ],
-  defender: [
-    { x: -5, z: -29.5 }, { x: -1.5, z: -29.5 }, { x: 1.5, z: -29.5 }, { x: 5, z: -29.5 }, { x: 0, z: -31.5 },
-  ],
-};
-
-/** Navigation waypoints (x, z) — edges are computed automatically by LOS. */
-export const NAV_NODES = [
-  // attacker spawn + yard
-  { x: 0, z: 28, tag: 'atkSpawn' },
-  { x: -7, z: 26, tag: 'atkSpawn' },
-  { x: 7, z: 26, tag: 'atkSpawn' },
-  { x: -16, z: 22, tag: 'yard' },
-  { x: 16, z: 22, tag: 'yard' },
-  { x: -9, z: 19, tag: 'yard' },
-  { x: 9, z: 19, tag: 'yard' },
-  { x: 0, z: 19.5, tag: 'yard' },
-  { x: -25, z: 19, tag: 'yard' },
-  { x: 25, z: 19, tag: 'yard' },
-  // mid lane
-  { x: 0, z: 12, tag: 'mid' },
-  { x: 0, z: 7, tag: 'mid' },
-  { x: 0, z: 3, tag: 'mid' },
-  { x: -1.5, z: -4, tag: 'mid' },
-  { x: 0, z: -9, tag: 'mid' },
-  // A main
-  { x: 25.5, z: 12, tag: 'amain' },
-  { x: 25.5, z: 7, tag: 'amain' },
-  { x: 25.5, z: 1, tag: 'amain' },
-  { x: 25.5, z: -5, tag: 'amain' },
-  { x: 24.5, z: -9.5, tag: 'amain' },
-  // B main
-  { x: -25.5, z: 12, tag: 'bmain' },
-  { x: -25.5, z: 7, tag: 'bmain' },
-  { x: -25.5, z: 1, tag: 'bmain' },
-  { x: -25.5, z: -5, tag: 'bmain' },
-  { x: -24.5, z: -9.5, tag: 'bmain' },
-  // A connector
-  { x: 14, z: 12, tag: 'aconn' },
-  { x: 14, z: 6, tag: 'aconn' },
-  { x: 14.5, z: 2.5, tag: 'aconn' },
-  { x: 14, z: -2.5, tag: 'aconn' },
-  { x: 11, z: -9.5, tag: 'aconn' },
-  { x: 24.5, z: -13.6, tag: 'aconn' },
-  // B connector
-  { x: -14, z: 12, tag: 'bconn' },
-  { x: -14, z: 6, tag: 'bconn' },
-  { x: -14.5, z: 2.5, tag: 'bconn' },
-  { x: -14.5, z: -2, tag: 'bconn' },
-  { x: -11, z: -9.5, tag: 'bconn' },
-  { x: -24.5, z: -13.6, tag: 'bconn' },
-  // CT / mid-to-CT
-  { x: 0, z: -14.5, tag: 'ct' },
-  { x: -7, z: -16, tag: 'ct' },
-  { x: 7, z: -16, tag: 'ct' },
-  { x: 0, z: -19.5, tag: 'ct' },
-  { x: -8.5, z: -21.5, tag: 'ct' },
-  { x: 8.5, z: -21.5, tag: 'ct' },
-  // defender spawn
-  { x: 0, z: -26, tag: 'defSpawn' },
-  { x: -5, z: -28, tag: 'defSpawn' },
-  { x: 4, z: -29, tag: 'defSpawn' },
-  // site A
-  { x: 13, z: -18, tag: 'siteA' },
-  { x: 13, z: -22, tag: 'siteA' },
-  { x: 17, z: -20, tag: 'siteA' },
-  { x: 20, z: -21, tag: 'siteA' },
-  { x: 22.5, z: -17.5, tag: 'siteA' },
-  { x: 25, z: -21, tag: 'siteA' },
-  { x: 27.5, z: -25, tag: 'siteA' },
-  { x: 23.5, z: -27, tag: 'siteA' },
-  { x: 18, z: -27.5, tag: 'siteA' },
-  { x: 29, z: -30.5, tag: 'siteA' },
-  { x: 24, z: -31, tag: 'siteA' },
-  { x: 15.5, z: -24, tag: 'siteA' },
-  // site B
-  { x: -13, z: -18, tag: 'siteB' },
-  { x: -13, z: -22, tag: 'siteB' },
-  { x: -17, z: -20, tag: 'siteB' },
-  { x: -20, z: -21, tag: 'siteB' },
-  { x: -22.5, z: -17.5, tag: 'siteB' },
-  { x: -25, z: -21, tag: 'siteB' },
-  { x: -27.5, z: -25, tag: 'siteB' },
-  { x: -23.5, z: -27, tag: 'siteB' },
-  { x: -18, z: -27.5, tag: 'siteB' },
-  { x: -29, z: -30.5, tag: 'siteB' },
-  { x: -24, z: -31, tag: 'siteB' },
-  { x: -15.5, z: -24, tag: 'siteB' },
-];
-
-/** Named defensive hold positions (used by bots): points + look direction. */
-export const HOLD_SPOTS = {
-  A: [
-    { x: 17, z: -26, look: { x: 0.2, z: 1 } },
-    { x: 28, z: -29, look: { x: -0.4, z: 1 } },
-    { x: 29, z: -15, look: { x: -0.7, z: 0.6 } },
-    { x: 14, z: -16, look: { x: 0.9, z: 0.4 } },
-  ],
-  B: [
-    { x: -17, z: -26, look: { x: -0.2, z: 1 } },
-    { x: -28, z: -29, look: { x: 0.4, z: 1 } },
-    { x: -29, z: -15, look: { x: 0.7, z: 0.6 } },
-    { x: -14, z: -16, look: { x: -0.9, z: 0.4 } },
-  ],
-  mid: [
-    { x: 4, z: -12.5, look: { x: 0, z: 1 } },
-    { x: -4, z: -12.5, look: { x: 0, z: 1 } },
-    { x: 0, z: -19, look: { x: 0, z: 1 } },
-  ],
-};
-
-/** Safe crossfire positions the attacking team holds once the spike is down.
- *  Kept well clear of the site so the blast does not wipe the attackers. */
-export const POST_PLANT_SPOTS = {
-  A: [
-    { x: 12.5, z: -15.5, look: { x: 1, z: -0.4 } },
-    { x: 28.5, z: -14.5, look: { x: -0.7, z: -0.7 } },
-    { x: 29.5, z: -29.5, look: { x: -1, z: 0.7 } },
-    { x: 24, z: -16, look: { x: -0.2, z: -1 } },
-  ],
-  B: [
-    { x: -12.5, z: -15.5, look: { x: -1, z: -0.4 } },
-    { x: -28.5, z: -14.5, look: { x: 0.7, z: -0.7 } },
-    { x: -29.5, z: -29.5, look: { x: 1, z: 0.7 } },
-    { x: -24, z: -16, look: { x: 0.2, z: -1 } },
-  ],
-};
-
-/** Hand authored lane routes so attacking bots spread out instead of all
- *  funnelling through mid. Each entry is a list of [x, z] waypoints. */
-export const ATTACK_PATHS = {
-  A: {
-    main: [[9, 20.5], [14.5, 20.4], [23, 19.9], [23, 14], [21.8, 10], [21.8, 3], [21.8, -6], [24.5, -10]],
-    conn: [[9, 20.5], [18, 20.3], [18, 16], [15.9, 13], [15.9, 4], [15.9, -1], [18.5, -2.5], [21.6, -2], [21.6, -7.5], [24.5, -10]],
-    mid: [[0, 20.5], [0, 11], [0, 3], [3.0, 1], [3.0, -9], [0, -13], [0, -16], [7, -16.5], [8.6, -18], [12, -19]],
-  },
-  B: {
-    main: [[-9, 20.5], [-14.5, 20.4], [-23, 19.9], [-23, 14], [-21.8, 10], [-21.8, 3], [-21.8, -6], [-24.5, -10]],
-    conn: [[-9, 20.5], [-18, 20.3], [-18, 16], [-15.9, 13], [-15.9, 4], [-15.9, -1], [-18.5, -2.5], [-21.6, -2], [-21.6, -7.5], [-24.5, -10]],
-    mid: [[0, 20.5], [0, 11], [0, 3], [-3.0, 1], [-3.0, -9], [0, -13], [0, -16], [-7, -16.5], [-8.6, -18], [-12, -19]],
-  },
-};
-
-export const ATTACK_ROUTES = {
-  A: ['yard', 'amain', 'siteA'],
-  B: ['yard', 'bmain', 'siteB'],
-  mid: ['yard', 'mid', 'ct'],
-};
-
-
-/** Cosmetic palettes so the same layout can be played in the visual language of
- *  different Valorant maps (Ascent's pale stone, Bind's terracotta, ...). */
+/** Cosmetic palettes per map theme. */
 export const THEMES = {
-  dune: {
-    label: 'DUNE',
-    desc: 'Çöl arenası — orijinal harita.',
-    wall: ['#c3b8a3', '#ab9f8a'], wallDark: ['#8f8574', '#7a7163'],
-    floor: '#a7a08f', lane: '#9d9686', spawn: '#8b8778',
-    ground: '#c8b28d', groundTint: [150, 130, 95], ground2: '#9a8567',
-    crate: '#8a6a45',
-    sky: ['#20364a', '#4a6a80', '#a8a191', '#e3c9a1', '#d8b38a', '#8f7f6f'],
-    sun: 0xffe4bd, hemi: [0xcfe6f5, 0x6d5a41],
+  sand: {
+    label: 'SAND', desc: 'Çöl tozu, kireç taşı duvarlar',
+    wall: 0xd8c49a, wallDark: 0xa8916a, floor: 0xcdb78d, ground: 0xc2a878, groundTint: 0xe0cba2,
+    crate: 0xb98b52, sky: [0x9dc4e8, 0xd8e6f2, 0xf0e2c4], sun: 0xfff0d2, hemi: [0xdfe8f5, 0xb59a6e],
   },
-  ascent: {
-    label: 'ASCENT',
-    desc: 'Venedik — açık mavi gökyüzü, fildişi taş.',
-    wall: ['#d9d3c6', '#c2bbac'], wallDark: ['#b0a99a', '#9a9384'],
-    floor: '#b9b3a4', lane: '#a9a496', spawn: '#9c9788',
-    ground: '#cbc6b8', groundTint: [200, 196, 186], ground2: '#a8a396',
-    crate: '#8f7a53',
-    sky: ['#12233a', '#2a5a8a', '#7fb0d8', '#cfe6f2', '#a8c8dc', '#6a8598'],
-    sun: 0xfff4e2, hemi: [0xdcefff, 0x6b6455],
+  terracotta: {
+    label: 'TERRACOTTA', desc: 'Kızıl kiremit, taş sokaklar',
+    wall: 0xb96a4a, wallDark: 0x8a4a33, floor: 0xb08968, ground: 0xa07a5c, groundTint: 0xc79d78,
+    crate: 0x8a5a36, sky: [0xe8b48a, 0xe6cfae, 0xf3e4c4], sun: 0xffd6a8, hemi: [0xf0dcc4, 0x7a5540],
   },
-  bind: {
-    label: 'BIND',
-    desc: 'Fas — kızıl toprak, kiremit duvarlar.',
-    wall: ['#c9a184', '#b08a6c'], wallDark: ['#9a7357', '#82604a'],
-    floor: '#b29178', lane: '#a5856c', spawn: '#94765f',
-    ground: '#c09068', groundTint: [176, 116, 84], ground2: '#8c5f42',
-    crate: '#7d5636',
-    sky: ['#2a1c2c', '#6a3444', '#c07a6a', '#f0c8a8', '#d8a488', '#a87a72'],
-    sun: 0xffd9b0, hemi: [0xf0d8c8, 0x6a4436],
+  industrial: {
+    label: 'INDUSTRIAL', desc: 'Beton, çelik, soğuk ışık',
+    wall: 0x8a9098, wallDark: 0x5d646c, floor: 0x8e949a, ground: 0x6f757c, groundTint: 0xa6adb4,
+    crate: 0x6b6f56, sky: [0x8fa6bb, 0xb9c8d6, 0xdfe7ee], sun: 0xe8f0ff, hemi: [0xd6e2ee, 0x5a6068],
   },
-  haven: {
-    label: 'HAVEN',
-    desc: 'Tibet manastırı — yosun yeşili, sisli ışık.',
-    wall: ['#bcc0ac', '#a4a893'], wallDark: ['#8a8f7c', '#737866'],
-    floor: '#a8ab98', lane: '#989b89', spawn: '#8b8e7d',
-    ground: '#b5b79f', groundTint: [170, 172, 150], ground2: '#8d9078',
-    crate: '#7a6b4a',
-    sky: ['#1b2a30', '#3f5f63', '#8faeae', '#dbe6dc', '#b9cabb', '#7d8f86'],
-    sun: 0xf2f6e8, hemi: [0xe2f0e6, 0x5c6152],
+  jungle: {
+    label: 'JUNGLE', desc: 'Yosun, taş, nemli hava',
+    wall: 0x8d8f72, wallDark: 0x5f6349, floor: 0x7d8460, ground: 0x5d6b47, groundTint: 0x8f9c6b,
+    crate: 0x6b5533, sky: [0xa9c3b0, 0xd0dcc8, 0xe6eddc], sun: 0xe6f2cf, hemi: [0xd8e6d0, 0x4f5c3f],
+  },
+  concrete: {
+    label: 'VERTIGO', desc: 'Yüksek beton, cam cephe',
+    wall: 0xb9bcc0, wallDark: 0x8b8f94, floor: 0xa8abaf, ground: 0x8f9297, groundTint: 0xc2c5c9,
+    crate: 0x9aa0a4, sky: [0xa8c8e8, 0xd2e2f2, 0xeef4f8], sun: 0xf4f8ff, hemi: [0xdfeaf6, 0x7d838a],
   },
 };
+
+/* ------------------------------------------------------------------ */
+/* live layout data (mutated by applyMap)                              */
+/* ------------------------------------------------------------------ */
+export const MAP_BOUNDS = { minX: -45, maxX: 45, minZ: -45, maxZ: 45 };
+/** [x, z, w, d, h, kind] */
+export const WALLS = [];
+/** [x, z, w, d, h, type] */
+export const PROPS = [];
+/** [x, z, w, d, material] */
+export const FLOORS = [];
+export const SITES = {
+  A: { id: 'A', center: { x: 0, z: 0 }, radius: 8, label: 'A' },
+  B: { id: 'B', center: { x: 0, z: 0 }, radius: 8, label: 'B' },
+};
+export const SPAWNS = { attacker: [{ x: 0, z: 10 }], defender: [{ x: 0, z: -10 }] };
+export const NAV_NODES = [];
+export const NAV_EDGES = [];
+export const PLANT_SPOTS = { A: [], B: [] };
+export const HOLD_SPOTS = { A: [], B: [], mid: [] };
+export const POST_PLANT_SPOTS = { A: [], B: [], mid: [] };
+export const ATTACK_PATHS = { A: {}, B: {} };
+
+export let CURRENT_MAP = MAPS[0];
+let built = null;
+
+const reset = (arr) => { arr.length = 0; return arr; };
+
+/**
+ * Build (once) and activate the layout of a real map.
+ * Returns the ready-to-use arena description.
+ */
+export function applyMap(mapId) {
+  const map = MAP_BY_ID[mapId] || MAPS[0];
+  CURRENT_MAP = map;
+  if (!built || built.id !== map.id) {
+    const cells = decodeMask(map);
+    const walls = buildWalls(map, cells);
+    const { nodes, edges } = buildNav(map, cells);
+    const spots = buildSpots(map, cells, nodes, edges);
+    built = { id: map.id, walls, nodes, edges, spots, theme: THEMES[map.theme] || THEMES.sand };
+  }
+
+  reset(WALLS).push(...built.walls);
+
+  reset(FLOORS).push([0, 0, 1, 1, 'ground']);
+
+  // cover crates around the bomb sites
+  reset(PROPS);
+  for (const key of ['A', 'B']) {
+    const site = map.sites[key];
+    const spots = built.spots.plantSpots[key] || [];
+    spots.forEach((p, i) => {
+      if (i % 2) return;
+      const off = i % 4 === 0 ? 1.9 : -1.9;
+      PROPS.push([p.x + off, p.z + off * 0.4, 1.1, 1.1, 1.15, 'crate']);
+    });
+  }
+
+  for (const key of ['A', 'B']) {
+    SITES[key].center.x = map.sites[key].center.x;
+    SITES[key].center.z = map.sites[key].center.z;
+    SITES[key].radius = map.sites[key].radius;
+  }
+
+  reset(SPAWNS.attacker).push(...map.spawns.attacker);
+  reset(SPAWNS.defender).push(...map.spawns.defender);
+
+  reset(NAV_NODES);
+  for (const n of built.nodes) NAV_NODES.push({ x: n.x, z: n.z, tag: n.tag });
+  reset(NAV_EDGES).push(...built.edges);
+
+  reset(PLANT_SPOTS.A).push(...(built.spots.plantSpots.A || []));
+  reset(PLANT_SPOTS.B).push(...(built.spots.plantSpots.B || []));
+  for (const key of ['A', 'B', 'mid']) {
+    reset(HOLD_SPOTS[key]).push(...(built.spots.holdSpots[key] || []));
+    reset(POST_PLANT_SPOTS[key]).push(...(built.spots.holdSpots[key] || []));
+  }
+  for (const key of ['A', 'B']) {
+    ATTACK_PATHS[key] = built.spots.attackPaths[key] || {};
+  }
+
+  MAP_BOUNDS.minX = map.bounds.minX;
+  MAP_BOUNDS.maxX = map.bounds.maxX;
+  MAP_BOUNDS.minZ = map.bounds.minZ;
+  MAP_BOUNDS.maxZ = map.bounds.maxZ;
+
+  return { map, theme: built.theme, cells: built.cells };
+}
+
+/** World → radar pixel coordinates (for the HUD minimap). */
+export function worldToRadar(map, x, z) {
+  const { meta } = map;
+  const ux = x / 0.0254;             // metres → source units
+  const uy = -z / 0.0254;
+  return {
+    px: (ux - meta.posX) / meta.scale,
+    py: (meta.posY - uy) / meta.scale,
+  };
+}
+
+applyMap(MAPS[0].id);

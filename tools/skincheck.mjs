@@ -17,7 +17,7 @@ globalThis.document = {
 
 const THREE = await import('three');
 const { buildWeaponModel } = await import('../src/game/weapons.js');
-const { WEAPON_SKINS } = await import('../src/game/valoAssets.js');
+const { WEAPON_SKINS } = await import('../src/game/csgoAssets.js');
 const { applySkinDecal } = await import('../src/game/skins.js');
 
 const fakeTex = { userData: { aspect: 3.2 }, colorSpace: '', wrapS: 0, wrapT: 0, repeat: { set() {} }, clone() { return this; } };
@@ -25,7 +25,7 @@ const rows = [];
 let bad = 0;
 for (const id of Object.keys(WEAPON_SKINS)) {
   const base = buildWeaponModel(id, true, undefined);
-  const skinned = buildWeaponModel(id, true, { [id]: WEAPON_SKINS[id][0].uuid });
+  const skinned = buildWeaponModel(id, true, { [id]: WEAPON_SKINS[id][0].id });
   const colours = new Set();
   skinned.traverse((o) => { if (o.isMesh && o.material?.color) colours.add(o.material.color.getHexString()); });
   const maps = [];
@@ -34,7 +34,7 @@ for (const id of Object.keys(WEAPON_SKINS)) {
   base.traverse((o) => { if (o.isMesh && o.material?.color) baseColours.add(o.material.color.getHexString()); });
 
   // decal geometry must end up outside the receiver, not buried in it
-  const ok = applySkinDecal(skinned, { uuid: 'x', name: 'Prime Vandal' }, { texture: fakeTex });
+  const ok = applySkinDecal(skinned, { id: 'x', name: 'AK-47 | Redline' }, { texture: fakeTex });
   let decalOk = ok;
   if (ok) {
     const art = skinned.userData.cvSkinDecal[0];

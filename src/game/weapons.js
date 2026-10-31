@@ -9,87 +9,93 @@ import { decorateWeaponModel } from './skins.js';
 export const WEAPONS = {
   knife: {
     id: 'knife', name: 'BIÇAK', type: 'MELEE', price: 0, slot: 2,
-    damage: 62, headMult: 1, rpm: 90, mag: 0, reserve: 0,
+    damage: 55, headMult: 1, rpm: 90, mag: 0, reserve: 0,
     auto: false, spread: 0, recoil: 0, range: 2.3, reload: 0,
     moveMult: 1.12, ads: 0, buyable: false, color: '#c9ced4',
     desc: 'Sessiz ve ölümcül. Sırtına giren bıçak iki kat hasar verir.',
   },
-  classic: {
-    id: 'classic', name: 'CLASSIC', type: 'TABANCA', price: 0, slot: 1,
-    damage: 26, headMult: 3.4, rpm: 360, mag: 12, reserve: 48,
-    auto: false, spread: 1.1, recoil: 1.05, range: 60, reload: 1.35,
-    moveMult: 1.05, ads: 1.15, buyable: false, color: '#b9c2c9',
-    desc: 'Ücretsiz başlangıç tabancası. Yakın mesafede iş görür.',
+  glock: {
+    id: 'glock', name: 'GLOCK-18', type: 'TABANCA', price: 0, slot: 1,
+    damage: 28, headMult: 4.0, rpm: 400, mag: 20, reserve: 120,
+    auto: false, spread: 1.15, recoil: 0.9, range: 55, reload: 1.4,
+    moveMult: 1.06, ads: 1.12, buyable: false, color: '#4a4f55',
+    desc: 'Teröristlerin ücretsiz başlangıç tabancası. 20 mermi, hızlı ateş.',
   },
-  ghost: {
-    id: 'ghost', name: 'GHOST', type: 'TABANCA', price: 500, slot: 1,
-    damage: 34, headMult: 3.4, rpm: 420, mag: 15, reserve: 60,
-    auto: false, spread: 0.85, recoil: 1.15, range: 70, reload: 1.5,
-    moveMult: 1.05, ads: 1.1, buyable: true, color: '#6f8fa8',
-    desc: 'Susturuculu tabanca. Kafaya iki isabet yeter.',
+  usp_s: {
+    id: 'usp_s', name: 'USP-S', type: 'TABANCA', price: 0, slot: 1,
+    damage: 35, headMult: 4.0, rpm: 352, mag: 12, reserve: 24,
+    auto: false, spread: 0.7, recoil: 1.0, range: 65, reload: 1.6,
+    moveMult: 1.05, ads: 1.08, buyable: false, color: '#3f4750',
+    desc: 'Anti-teröristlerin susturuculu tabancası. Sessiz ve isabetli.',
   },
-  sheriff: {
-    id: 'sheriff', name: 'SHERIFF', type: 'TABANCA', price: 800, slot: 1,
-    damage: 62, headMult: 2.9, rpm: 240, mag: 6, reserve: 30,
-    auto: false, spread: 0.7, recoil: 2.4, range: 70, reload: 2.1,
-    moveMult: 1.05, ads: 1.05, buyable: true, color: '#c8a45c',
-    desc: 'Altı patlar, altı öldürür. Yakın mesafenin kralı.',
+  p250: {
+    id: 'p250', name: 'P250', type: 'TABANCA', price: 300, slot: 1,
+    damage: 38, headMult: 3.6, rpm: 400, mag: 13, reserve: 26,
+    auto: false, spread: 0.95, recoil: 1.3, range: 60, reload: 1.7,
+    moveMult: 1.05, ads: 1.1, buyable: true, color: '#5b6470',
+    desc: 'Ucuz ve güçlü. Eko turlarında zırh delen tabanca.',
   },
-  spectre: {
-    id: 'spectre', name: 'SPECTRE', type: 'HAFİF MAKİNELİ', price: 1600, slot: 1,
-    damage: 25, headMult: 2.7, rpm: 820, mag: 30, reserve: 90,
-    auto: true, spread: 1.35, recoil: 0.85, range: 55, reload: 2.1,
-    moveMult: 1.02, ads: 1.25, buyable: true, color: '#7d8f6d',
-    desc: 'Hızlı ateş eden hafif makineli. Yakın dövüşte çok güçlü.',
+  deagle: {
+    id: 'deagle', name: 'DESERT EAGLE', type: 'TABANCA', price: 700, slot: 1,
+    damage: 63, headMult: 3.2, rpm: 267, mag: 7, reserve: 35,
+    auto: false, spread: 0.55, recoil: 2.6, range: 80, reload: 2.2,
+    moveMult: 1.04, ads: 1.05, buyable: true, color: '#c8a45c',
+    desc: 'Altı patlar, tek kurşun öldürür. Ama geri tepmesi acımasız.',
   },
-  judge: {
-    id: 'judge', name: 'JUDGE', type: 'AV TÜFEĞİ', price: 1850, slot: 1,
-    damage: 18, pellets: 9, headMult: 1.3, rpm: 220, mag: 7, reserve: 28,
-    auto: true, spread: 4.6, recoil: 2.9, range: 22, reload: 2.6,
-    moveMult: 1.0, ads: 1.0, buyable: true, color: '#8a5a3a',
-    desc: 'Pompalı. Köşe tutanların korkulu rüyası.',
+  mac10: {
+    id: 'mac10', name: 'MAC-10', type: 'HAFİF MAKİNELİ', price: 1050, slot: 1,
+    damage: 29, headMult: 3.1, rpm: 800, mag: 30, reserve: 100,
+    auto: true, spread: 1.8, recoil: 0.8, range: 42, reload: 1.9,
+    moveMult: 1.03, ads: 1.2, buyable: true, color: '#4a4a46',
+    desc: 'Ucuz SMG. Yakın mesafede seri ateş ve yüksek mobilite.',
   },
-  bulldog: {
-    id: 'bulldog', name: 'BULLDOG', type: 'TÜFEK', price: 2100, slot: 1,
-    damage: 34, headMult: 3.2, rpm: 620, mag: 24, reserve: 72,
-    auto: true, spread: 1.15, recoil: 1.5, range: 80, reload: 2.2,
-    moveMult: 0.98, ads: 1.4, buyable: true, color: '#5f6d76',
-    desc: 'Ekonomik tüfek. Orta mesafede dengeli.',
+  mp9: {
+    id: 'mp9', name: 'MP9', type: 'HAFİF MAKİNELİ', price: 1250, slot: 1,
+    damage: 26, headMult: 3.1, rpm: 857, mag: 30, reserve: 120,
+    auto: true, spread: 1.45, recoil: 0.75, range: 48, reload: 2.1,
+    moveMult: 1.02, ads: 1.18, buyable: true, color: '#414a52',
+    desc: 'Hızlı ve isabetli SMG. Anti-teröristlerin favorisi.',
   },
-  vandal: {
-    id: 'vandal', name: 'VANDAL', type: 'TÜFEK', price: 2900, slot: 1,
-    damage: 40, headMult: 3.9, rpm: 660, mag: 25, reserve: 75,
-    auto: true, spread: 0.95, recoil: 1.9, range: 120, reload: 2.4,
-    moveMult: 0.96, ads: 1.25, buyable: true, color: '#b3783f',
-    desc: 'Mesafe ne olursa olsun kafaya tek isabet. Klasik tüfek.',
+  ssg08: {
+    id: 'ssg08', name: 'SSG 08', type: 'KESKİN NİŞANCI', price: 1700, slot: 1,
+    damage: 88, headMult: 2.2, rpm: 48, mag: 10, reserve: 90,
+    auto: false, spread: 0.35, recoil: 3.4, range: 200, reload: 2.9,
+    moveMult: 0.94, ads: 3.4, scope: true, buyable: true, color: '#4d5a4f',
+    desc: 'Ucuz nişancı. Gövdeye iki isabet ya da tek kafa yeter.',
   },
-  phantom: {
-    id: 'phantom', name: 'PHANTOM', type: 'TÜFEK', price: 2900, slot: 1,
-    damage: 37, headMult: 3.7, rpm: 700, mag: 30, reserve: 90,
-    auto: true, spread: 0.85, recoil: 1.7, range: 90, reload: 2.5,
-    moveMult: 0.97, ads: 1.25, buyable: true, color: '#3e6b86',
-    desc: 'Susturuculu tüfek. Duman içinden bile isabet ettirir.',
+  ak47: {
+    id: 'ak47', name: 'AK-47', type: 'TÜFEK', price: 2700, slot: 1,
+    damage: 36, headMult: 4.2, rpm: 600, mag: 30, reserve: 90,
+    auto: true, spread: 1.0, recoil: 2.0, range: 120, reload: 2.4,
+    moveMult: 0.96, ads: 1.25, buyable: true, color: '#8a5a30',
+    desc: 'Tek kafa atışında öldürür. Recoil desenini öğrenen kral olur.',
   },
-  operator: {
-    id: 'operator', name: 'OPERATOR', type: 'KESKİN NİŞANCI', price: 4700, slot: 1,
-    damage: 165, headMult: 1.6, rpm: 52, mag: 5, reserve: 15,
-    auto: false, spread: 0.45, recoil: 5.5, range: 200, reload: 3.3,
-    moveMult: 0.86, ads: 4.2, scope: true, buyable: true, color: '#4e5a63',
-    desc: 'Tek isabet, tek ceset. Ağır ama affetmez.',
+  m4a4: {
+    id: 'm4a4', name: 'M4A4', type: 'TÜFEK', price: 3100, slot: 1,
+    damage: 33, headMult: 3.8, rpm: 666, mag: 30, reserve: 90,
+    auto: true, spread: 0.9, recoil: 1.75, range: 110, reload: 2.5,
+    moveMult: 0.97, ads: 1.22, buyable: true, color: '#3e4a54',
+    desc: 'Dengeli tüfek. AK-47 kadar sert değil ama kontrolü kolay.',
   },
-  odin: {
-    id: 'odin', name: 'ODIN', type: 'MİNİGUN', price: 3200, slot: 1,
-    damage: 30, headMult: 2.3, rpm: 780, mag: 60, reserve: 120,
-    auto: true, spread: 1.6, recoil: 1.3, range: 100, reload: 4.0,
-    moveMult: 0.9, ads: 1.2, buyable: true, color: '#6b6f58',
-    desc: 'Ağır makineli. Şarjörü bitene kadar her şeyi deler.',
+  awp: {
+    id: 'awp', name: 'AWP', type: 'KESKİN NİŞANCI', price: 4750, slot: 1,
+    damage: 115, headMult: 1.6, rpm: 41, mag: 10, reserve: 30,
+    auto: false, spread: 0.4, recoil: 6.0, range: 250, reload: 3.6,
+    moveMult: 0.82, ads: 4.6, scope: true, buyable: true, color: '#38424a',
+    desc: 'Gövdeye tek isabet, tek ölüm. Her mermi bir servet.',
   },
 };
 
-export const BUY_ORDER = ['ghost', 'sheriff', 'spectre', 'judge', 'bulldog', 'vandal', 'phantom', 'operator', 'odin'];
+export const BUY_ORDER = ['p250', 'deagle', 'mac10', 'mp9', 'ssg08', 'ak47', 'm4a4', 'awp'];
+
+/** Every weapon id renders with one of the procedural models below. */
+export const WEAPON_SHAPE = {
+  knife: 'knife', glock: 'classic', usp_s: 'ghost', p250: 'classic', deagle: 'sheriff',
+  mac10: 'spectre', mp9: 'spectre', ssg08: 'operator', ak47: 'vandal', m4a4: 'phantom', awp: 'operator',
+};
 
 export function getWeapon(id) {
-  return WEAPONS[id] || WEAPONS.classic;
+  return WEAPONS[id] || WEAPONS.glock;
 }
 
 /* ------------------------------------------------------------------ */
@@ -133,11 +139,12 @@ function cyl(rt, rb, h, mat, x = 0, y = 0, z = 0, rx = Math.PI / 2, seg = 12) {
 export function buildWeaponModel(id, viewmodel = true, skinMap = null) {
   const g = new THREE.Group();
   const w = getWeapon(id);
+  const shape = WEAPON_SHAPE[id] || id;
   const muzzle = new THREE.Object3D();
   const shellEject = new THREE.Object3D();
   let magMesh = null;
 
-  switch (id) {
+  switch (shape) {
     case 'knife': {
       const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.16, 0.42), M.steel);
       blade.position.set(0, 0.06, -0.34);

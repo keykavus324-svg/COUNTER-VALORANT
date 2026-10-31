@@ -32,9 +32,9 @@ function mat(color, opts = {}) {
 }
 
 export class Character {
-  constructor({ agentId = 'blaze', team = 'ally', name = 'BOT', isPlayer = false }) {
+  constructor({ agentId = 'phoenix', team = 'ally', name = 'BOT', isPlayer = false }) {
     this.agentId = agentId;
-    this.agent = AGENTS[agentId] || AGENTS.blaze;
+    this.agent = AGENTS[agentId] || AGENTS.phoenix;
     this.team = team;
     this.name = name;
     this.isPlayer = isPlayer;
@@ -143,7 +143,7 @@ export class Character {
     jaw.position.set(0, 0.04, 0.02);
     headGroup.add(neck, head, helmet, visor, jaw);
     // agent accents
-    if (this.agentId === 'blaze') {
+    if (this.agentId === 'phoenix') {
       const fin = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 4), secondaryMat);
       fin.position.set(0, 0.27, -0.02);
       headGroup.add(fin);
@@ -209,7 +209,7 @@ export class Character {
         o.receiveShadow = true;
       }
     });
-    this.setWeapon('classic');
+    this.setWeapon('glock');
 
     // ---- name tag ----
     this._buildNameTag();
