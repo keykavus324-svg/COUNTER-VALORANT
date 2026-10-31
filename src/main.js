@@ -54,7 +54,7 @@ function startMatch(agentId, settings) {
         game.init();
         ui.el.canvas = freshCanvas;
         ui.bindGame(game);
-        ui.setLoading(0.82, 'AJANLAR KONUMLANDIRILIYOR…');
+        ui.setLoading(0.82, 'OPERATÖRLER KONUMLANDIRILIYOR…');
         game.start();
         ui.setLoading(1, 'HAZIR');
         setTimeout(() => {
@@ -111,7 +111,7 @@ async function boot() {
 
   ui.setLoading(0.35, 'ARAYÜZ YÜKLENİYOR…');
   await new Promise((r) => setTimeout(r, 240));
-  ui.setLoading(0.68, 'AJANLAR HAZIRLANIYOR…');
+  ui.setLoading(0.68, 'OPERATÖRLER HAZIRLANIYOR…');
   await new Promise((r) => setTimeout(r, 240));
   ui.setLoading(0.94, 'SUNUCUYA BAĞLANILIYOR…');
   await new Promise((r) => setTimeout(r, 220));
