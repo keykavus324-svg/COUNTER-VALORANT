@@ -10,13 +10,19 @@ const SKILLS = {
   hard: { reaction: 0.24, turn: 7.6, error: 0.024, burst: 0.9, headBias: 0.34, strafe: 0.8, visionRange: 60 },
 };
 
+export const BOT_SKILLS = SKILLS;
+
+export function skillFor(difficulty) {
+  return SKILLS[difficulty] || SKILLS.normal;
+}
+
 let botUid = 0;
 
 export class Bot extends Actor {
   constructor(game, { team = 'enemy', agentId = 'phoenix', name = 'BOT', difficulty = 'normal' } = {}) {
     super(game, { team, agentId, name, isPlayer: false });
     this.isBot = true;
-    this.skill = SKILLS[difficulty] || SKILLS.normal;
+    this.skill = skillFor(difficulty);
     this.difficulty = difficulty;
 
     this.state = 'idle';

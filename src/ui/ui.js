@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
   chColor: '#5dff9a',
   chDotColor: '#ffffff',
   chGap: 6,
+  botDifficulty: 'normal',
   chThick: 2,
   chOutline: true,
   chDynamic: true,
@@ -299,6 +300,7 @@ export class UI {
     set('#set-vol', s.volume); out('#out-vol', s.volume.toFixed(2));
     set('#set-music', s.music); out('#out-music', s.music.toFixed(2));
     set('#set-quality', s.quality);
+    set('#set-bots', s.botDifficulty || 'normal');
     set('#set-ch-color', s.chColor);
     set('#set-dot-color', s.chDotColor);
     set('#set-ch-gap', s.chGap); out('#out-ch-gap', s.chGap);
@@ -331,6 +333,12 @@ export class UI {
       out('#out-music', s.music.toFixed(2));
       audio.setMusicVolume(s.music);
       this.save();
+    });
+    $('#set-bots').addEventListener('change', (e) => {
+      s.botDifficulty = e.target.value;
+      this.game?.setBotDifficulty?.(s.botDifficulty);
+      this.save();
+      this.toast(`Bot zorluğu: ${e.target.selectedOptions[0]?.textContent || s.botDifficulty}`, 2.2);
     });
     $('#set-quality').addEventListener('change', (e) => {
       s.quality = e.target.value;
@@ -367,6 +375,7 @@ export class UI {
     set('#set-vol', this.settings.volume); out('#out-vol', this.settings.volume.toFixed(2));
     set('#set-music', this.settings.music); out('#out-music', this.settings.music.toFixed(2));
     set('#set-quality', this.settings.quality);
+    set('#set-bots', this.settings.botDifficulty || 'normal');
     set('#set-ch-color', this.settings.chColor);
     set('#set-dot-color', this.settings.chDotColor);
     set('#set-ch-gap', this.settings.chGap); out('#out-ch-gap', this.settings.chGap);

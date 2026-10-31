@@ -3,7 +3,7 @@ import { GameMap } from '../world/map.js';
 import { Effects } from './effects.js';
 import { Viewmodel } from './Viewmodel.js';
 import { Player } from './player.js';
-import { Bot } from './bot.js';
+import { Bot, skillFor } from './bot.js';
 import { Actor, ACTOR_RADIUS, ACTOR_HEIGHT } from './actor.js';
 import { getWeapon, WEAPONS, BUY_ORDER, BUY_GROUPS } from './weapons.js';
 import { AGENTS, AGENT_LIST } from './agents.js';
@@ -20,8 +20,8 @@ const PLANT_TIME = 3.2;
 const DEFUSE_TIME = 10;      // sans kit
 const DEFUSE_TIME_KIT = 5;   // defuse kit ile
 const ROUND_END_TIME = 5.5;
-const ROUNDS_TO_WIN = 13;
-const MAX_ROUNDS = 24;
+const ROUNDS_TO_WIN = 13;   // MR12: first to 13
+const MAX_ROUNDS = 24;      // 12 + 12 regulation rounds
 
 const PHASE_LABEL = {
   buy: 'SATIN ALMA',
@@ -1926,6 +1926,18 @@ export class Game {
     }
     audio.play('dryfire', { volume: 0.35 });
     return false;
+  }
+
+  /** Change the bot skill live (settings menu). */
+  setBotDifficulty(difficulty) {
+    this.settings.botDifficulty = difficulty;
+    for (const a of this.actors) {
+      if (a.isBot) {
+        a.difficulty = difficulty;
+        a.skill = skillFor(difficulty);
+      }
+    }
+    return difficulty;
   }
 
   /** Re-apply equipped skins to the viewmodel and every visible actor. */

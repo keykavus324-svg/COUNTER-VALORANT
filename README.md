@@ -14,14 +14,29 @@ npm run dev      # http://localhost:5173
 * **8 gerçek harita** — Dust II, Mirage, Inferno, Nuke, Ancient, Anubis, Vertigo,
   Train. Her arena resmî CS2 radar'ından üretilir: yürünebilir maske → çarpışma
   geometrisi + waypoint grafiği. HUD'daki radar da o haritanın gerçek radar'ı.
-* **11 silah / 115 gerçek kaplama** — AK-47, M4A4, AWP, SSG 08, Desert Eagle,
-  USP-S, Glock-18, P250, MP9, MAC-10, bıçak. Kaplamalar Valve'ın render'larıyla
-  silaha bindirilir, ağ yoksa kendi deseniyle boyanır.
-* **CS ekonomisi** — $800 başlangıç, öldürme $300, round $3250 / $1400, zırh,
-  el bombaları (flash, smoke, molotov, HE).
-* **Defuse modu** — C4 kurulumu 4 s, geri sayım 45 s, çözüm 7 s. İlk 5 round.
+* **17 silah / 115 gerçek kaplama** — AK-47, M4A4, AUG, SG 553, Galil, FAMAS,
+  AWP, SSG 08, Nova, XM1014, M249, MP9, MAC-10, UMP-45, MP7, Desert Eagle,
+  P250, USP-S, Glock-18 ve bıçak. Kaplamalar Valve'ın render'larıyla silaha
+  bindirilir, ağ yoksa kendi deseniyle boyanır.
+* **Kaplama derinliği** — her kaplamanın float/aşınma derecesi (FN → BS) ve
+  StatTrak öldürme sayacı vardır; sayaç profilde kalıcı olarak saklanır.
+* **CS mekaniği**
+  * MR12 maç yapısı: ilk 13 round, 12. roundda taraf değişimi.
+  * Ekonomi: $800 başlangıç, öldürme $300, kazanma $3250, kaybetme serisi
+    $1400 → $1700 → $2000 → $2300 → $2600 → $2900, tavan $16000.
+  * Kevlar $650, Kevlar+Kask $1000 (yelek varsa kask yükseltmesi $350),
+    Defuse Kit $400 (çözüm 10 s → 5 s).
+  * Silaha özel **spray pattern** (AK/M4/SMG/tabanca), ilk mermi isabeti,
+    hareket/havada sapma, vurulunca yavaşlama (tagging).
+  * Fizikli el bombaları: sekme, fitil, duman (görüş hattını keser),
+    flash (kör etme), molotov (alan hasarı), HE (mesafeye göre hasar).
 * **Botlar** — gerçek harita grafiğinde A* ile rota kurar, site tutar, plant/defuse
-  yapar.
+  yapar, satın alma yapar ve el bombası kullanır. Ayarlardan zorluk seçilir
+  (kolay / normal / zor).
+* **Kariyer profili** — maç geçmişi, harita bazlı kazanma oranı, K/D, isabet,
+  HS%, ADR, rating, en çok kullanılan silahlar; localStorage'da saklanır.
+* **Nişangâh editörü** — renk, boşluk, uzunluk, kalınlık, dış çizgi, dinamik
+  açılma ve canlı önizleme.
 
 ## Kontroller
 
@@ -32,6 +47,8 @@ npm run dev      # http://localhost:5173
 | R / 1-2-3 / B | şarjör / slot / satın alma |
 | Q E C X | flash · smoke · molotov · HE |
 | F | C4 kur / çöz |
+| V | silahı incele (kaplamayı göster) |
+| Tab / Esc | skor tablosu / duraklat |
 
 ## Komutlar
 
