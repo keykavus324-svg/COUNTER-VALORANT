@@ -9,6 +9,7 @@ import { getWeapon, WEAPONS, BUY_ORDER, BUY_GROUPS } from './weapons.js';
 import { AGENTS, AGENT_LIST } from './agents.js';
 import { audio } from '../core/audio.js';
 import { recordMatch, loadProfile, profileSummary } from './profile.js';
+import { Grenade, GRENADE_TUNING } from './grenade.js';
 import { clamp, rand, choice, shuffle, rayBoxes, boxFromCenter, resolveCircleBoxXZ, distance2D, angleDiff } from '../core/utils.js';
 import { PLANT_SPOTS, HOLD_SPOTS, SPAWNS, SITES, MAP_BOUNDS, ATTACK_PATHS, CURRENT_MAP } from '../world/mapLayout.js';
 
@@ -50,6 +51,7 @@ export class Game {
     this.playerInBuyZone = true;
     this.weaponKills = {};
     this.lossStreak = { ally: 0, enemy: 0 };
+    this.grenades = [];
     this.aceCount = 0;
     this.scores = { ally: 0, enemy: 0 };
     this.attackingTeam = 'ally';
@@ -1242,6 +1244,22 @@ export class Game {
 
   spawnAbilityProjectile(actor, ability, targetPoint) {
     const start = actor.getEye(new THREE.Vector3());
+    if (GRENADE_TUNING[ability.id]) {
+      const dir = targetPoint.clone().sub(start).normalize();
+      const dist = start.distanceTo(targetPoint);
+      const power = clamp(dist / 22, 0.25, 1);
+      const g = new Grenade({
+        scene: this.scene,
+        type: ability.id,
+        origin: start.clone().addScaledVector(dir, 0.3),
+        dir,
+        power,
+        owner: actor,
+      });
+      this.grenades.push(g);
+      audio.play('grenade_throw', { pos: actor.isPlayer ? null : actor.pos, volume: 0.5 });
+      return;
+    }
     const colors = {
       firewall: 0xff5a2c, flash: 0xfff0c0, smoke: 0xb8c4cc, blackout: 0x8f6bff,
       radar: 0x30f3c8, shock: 0x9fe8ff, inferno2: 0xff8a3c,
@@ -1521,8 +1539,30 @@ export class Game {
     this.renderer?.dispose();
   }
 
+  updateGrenades(dt) {
+    if (!this.grenades.length) return;
+    const world = {
+      boxes: (this.map?.bulletBoxes || []).map((b) => b.box || b),
+      heightAt: (x, z) => this.map?.groundHeightAt?.(x, z) ?? 0,
+    };
+    for (const g of this.grenades) {
+      g.update(dt, world, {
+        onBounce: (pos, speed) => {
+          if (speed > 1.6) audio.play('grenade_bounce', { pos, volume: clamp(speed / 14, 0.15, 0.6) });
+        },
+        onDetonate: (gren) => this.detonateGrenade(gren),
+      });
+    }
+    this.grenades = this.grenades.filter((g) => !g.dead);
+  }
+
+  detonateGrenade(g) {
+    this._resolveProjectile({ actor: g.owner || this.player, ability: { id: g.type }, target: g.pos.clone() });
+  }
+
   update(dt) {
     this.time += dt;
+    this.updateGrenades(dt);
     if (this.player?.alive) this.ui?.updateCrosshairDynamics?.(this.player);
     this.playerInBuyZone = this.inBuyZone(this.player);
 

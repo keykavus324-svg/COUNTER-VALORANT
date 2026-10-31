@@ -609,64 +609,65 @@ export class Bot extends Actor {
   }
 
   /* -------------------------------------------------------------- */
+  /**
+   * Counter-Strike utility usage.
+   *
+   * Nobody has hero powers here: bots simply spend the grenades they bought.
+   * Attackers smoke and flash the site they are hitting; defenders molotov the
+   * planted bomb or the chokepoint they are holding.
+   */
   tryAbilities() {
     const game = this.game;
     const enemy = this.target;
-    const agent = this.agentId;
     const has = (id) => this.abilityReady(id);
+    const attacker = this.team === game.attackingTeam;
+    const site = game.sites?.[game.attackSite];
+    const sitePoint = site ? new THREE.Vector3(site.center.x, 0, site.center.z) : null;
+    const spikePoint = game.spike?.state === 'planted'
+      ? new THREE.Vector3(game.spike.pos.x, 0, game.spike.pos.z) : null;
 
-    if (agent === 'veil') {
-      if (has('smoke') && (this.state === 'move' || this.state === 'idle') && Math.random() < 0.5) {
-        const site = this.team === game.attackingTeam ? game.sites[game.attackSite] : null;
-        const point = site
-          ? new THREE.Vector3(site.center.x, 0, site.center.z)
-          : new THREE.Vector3(this.pos.x + Math.sin(this.yaw) * -12, 0, this.pos.z + Math.cos(this.yaw) * -12);
-        this.useAbility('smoke', point);
-      } else if (has('recon') && !enemy && Math.random() < 0.25) {
-        this.useAbility('recon');
+    if (attacker) {
+      // --- execute: cover the entry with smoke, then flash over it
+      if (has('smoke') && this.state === 'move' && sitePoint && Math.random() < 0.05) {
+        const aim = sitePoint.clone().add(new THREE.Vector3(rand(-4, 4), 1.2, rand(-4, 4)));
+        this.useAbility('smoke', aim);
+        return;
       }
-    } else if (agent === 'phoenix') {
-      if (has('flash') && enemy && distance2D(this.pos, enemy.pos) > 6 && Math.random() < 0.5) {
-        this.useAbility('flash', new THREE.Vector3(enemy.pos.x, 1.2, enemy.pos.z));
-      } else if (has('firewall') && Math.random() < 0.25) {
-        const p = new THREE.Vector3(
-          this.pos.x - Math.sin(this.yaw) * 14,
-          0,
-          this.pos.z - Math.cos(this.yaw) * 14
-        );
-        this.useAbility('firewall', p);
-      } else if (has('dash') && this.state === 'engage' && Math.random() < 0.2) {
-        this.useAbility('dash');
+      if (has('flash') && enemy && distance2D(this.pos, enemy.pos) > 6 && Math.random() < 0.22) {
+        this.useAbility('flash', new THREE.Vector3(enemy.pos.x, 1.4, enemy.pos.z));
+        return;
       }
-    } else if (agent === 'pulse') {
-      if (has('radar') && !enemy && Math.random() < 0.55) this.useAbility('radar');
-      else if (has('shock') && enemy && Math.random() < 0.4) {
+      if (has('firewall') && spikePoint && Math.random() < 0.06) {
+        this.useAbility('firewall', spikePoint.clone().add(new THREE.Vector3(rand(-3, 3), 0, rand(-3, 3))));
+        return;
+      }
+      if (has('shock') && enemy && distance2D(this.pos, enemy.pos) < 22 && Math.random() < 0.2) {
         this.useAbility('shock', new THREE.Vector3(enemy.pos.x, 0, enemy.pos.z));
-      } else if (has('stun') && enemy && distance2D(this.pos, enemy.pos) < 14 && Math.random() < 0.4) {
-        this.useAbility('stun');
       }
-    } else if (agent === 'oath') {
-      if (has('heal') && this.health < 60) this.useAbility('heal');
-      else if (has('shield') && Math.random() < 0.4) this.useAbility('shield');
-      else if (has('barrier') && enemy && Math.random() < 0.3) this.useAbility('barrier');
+      return;
     }
 
-    // ultimates
-    for (const ab of this.agent.abilities) {
-      if (!ab.ultimate) continue;
-      if (!this.abilityReady(ab.id)) continue;
-      const st = this.abilityState[ab.id];
-      if (st.ultPoints < this.ultCost) continue;
-      if (Math.random() > 0.35) continue;
-      if (ab.id === 'sanctuary') {
-        if (this.health < 70) this.useAbility(ab.id);
-      } else if (ab.id === 'inferno') {
-        if (this.state === 'engage' && enemy && distance2D(this.pos, enemy.pos) < 12) this.useAbility(ab.id);
-      } else if (ab.id === 'emp') {
-        if (enemy || Math.random() < 0.4) this.useAbility(ab.id);
-      } else if (ab.id === 'blackout') {
-        this.useAbility(ab.id, new THREE.Vector3(this.pos.x + Math.sin(this.yaw) * -16, 0, this.pos.z + Math.cos(this.yaw) * -16));
+    // --- defenders: deny the plant / retake with fire and smoke
+    if (spikePoint) {
+      if (has('firewall') && Math.random() < 0.07) {
+        this.useAbility('firewall', spikePoint.clone().add(new THREE.Vector3(rand(-2.5, 2.5), 0, rand(-2.5, 2.5))));
+        return;
       }
+      if (has('smoke') && Math.random() < 0.04) {
+        this.useAbility('smoke', spikePoint.clone().setY(1.2));
+        return;
+      }
+    }
+    if (has('flash') && enemy && distance2D(this.pos, enemy.pos) < 18 && Math.random() < 0.2) {
+      this.useAbility('flash', new THREE.Vector3(enemy.pos.x, 1.4, enemy.pos.z));
+      return;
+    }
+    if (has('shock') && enemy && distance2D(this.pos, enemy.pos) < 18 && Math.random() < 0.15) {
+      this.useAbility('shock', new THREE.Vector3(enemy.pos.x, 0, enemy.pos.z));
+      return;
+    }
+    if (has('smoke') && this.state === 'hold' && Math.random() < 0.02 && sitePoint) {
+      this.useAbility('smoke', sitePoint.clone().add(new THREE.Vector3(rand(-5, 5), 1.2, rand(-5, 5))));
     }
   }
 

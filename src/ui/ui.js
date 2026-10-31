@@ -529,7 +529,7 @@ export class UI {
 
   setTimer(seconds, label, urgent) {
     const s = Math.max(0, Number(seconds) || 0);
-    this.el.timer.textContent = (label === 'SPIKE' || label === 'TUR SONU')
+    this.el.timer.textContent = (label === 'BOMBA' || label === 'TUR SONU')
       ? String(Math.ceil(s))
       : fmtTime(s);
     this.el.phaseLabel.textContent = label;
@@ -591,7 +591,7 @@ export class UI {
         div.title = `ULTİMATE: ${ab.name}`;
         div.style.cursor = 'default';
       } else {
-        div.title = `${ab.name} — ${ab.price}₡`;
+        div.title = `${ab.name} — ${ab.price}$`;
       }
       this.el.abilities.appendChild(div);
     }
@@ -751,7 +751,7 @@ export class UI {
       return;
     }
     this.el.plantProgress.classList.remove('hidden');
-    this.el.plantProgress.querySelector('span').textContent = `SPIKE KURULUYOR ${Math.round(p * 100)}%`;
+    this.el.plantProgress.querySelector('span').textContent = `BOMBA KURULUYOR ${Math.round(p * 100)}%`;
   }
 
   defuseProgress(p) {
@@ -760,7 +760,7 @@ export class UI {
       return;
     }
     this.el.defuseProgress.classList.remove('hidden');
-    this.el.defuseProgress.querySelector('span').textContent = `SPIKE ÇÖZÜLÜYOR ${Math.round(p * 100)}%`;
+    this.el.defuseProgress.querySelector('span').textContent = `BOMBA ÇÖZÜLÜYOR ${Math.round(p * 100)}%`;
   }
 
   showClickToPlay(on) {
@@ -1114,7 +1114,7 @@ export class UI {
     this.el.sbAllies.innerHTML = team(data.ally, '');
     this.el.sbEnemies.innerHTML = team(data.enemy, 'enemy');
     document.querySelector('#scoreboard .sb-mode').textContent =
-      `TAKTİK / 5v5 — SPIKE · ROUND ${data.round}`;
+      `TAKTİK / 5v5 — BOMBA · ROUND ${data.round}`;
   }
 
   /* ================================================================ */
