@@ -13,6 +13,8 @@ export class Player extends Actor {
     this.sensitivity = 0.45;
     this.recoilPitch = 0;
     this.recoilYaw = 0;
+    this.inspectTimer = 0;
+    this.inspectCooldown = 0;
     this.viewBobPhase = 0;
     this.landDip = 0;
     this.shake = 0;
@@ -87,6 +89,8 @@ export class Player extends Actor {
 
     // ---- recoil recovery ----
     this.tagAmount = Math.max(0, (this.tagAmount || 0) - dt * 2.5);
+    if (this.inspectTimer > 0) this.inspectTimer = Math.max(0, this.inspectTimer - dt);
+    if (this.inspectCooldown > 0) this.inspectCooldown = Math.max(0, this.inspectCooldown - dt);
     this.recoilPitch = damp(this.recoilPitch, 0, 5.5, dt);
     this.recoilYaw = damp(this.recoilYaw, 0, 5.5, dt);
 
@@ -267,6 +271,7 @@ export class Player extends Actor {
       crouch: this.crouch,
       mouseDX: this.lastMouseDX,
       mouseDY: this.lastMouseDY,
+      inspect: this.inspectTimer || 0,
     };
   }
 }

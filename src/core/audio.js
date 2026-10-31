@@ -178,6 +178,21 @@ export class AudioEngine {
       case 'shot_knife':
         this._noise(0.12, { type: 'bandpass', freq: 2800, q: 1.4, gain: 0.25, dest });
         break;
+      case 'weapon_inspect':
+        // cloth + metal handling: two soft band-passed noise taps
+        this._noise(0.12, { type: 'bandpass', freq: 1200, q: 1.2, gain: 0.10, dest });
+        setTimeout(() => {
+          if (this.ready) this._noise(0.09, { type: 'bandpass', freq: 2400, q: 1.8, gain: 0.07, dest });
+        }, 140);
+        break;
+      case 'grenade_throw':
+        this._noise(0.10, { type: 'highpass', freq: 1800, gain: 0.12, dest });
+        this._tone(320, 0.08, { type: 'sine', gain: 0.06, slideTo: 180, dest });
+        break;
+      case 'grenade_bounce':
+        this._tone(520 + Math.random() * 220, 0.06, { type: 'triangle', gain: 0.09, slideTo: 240, dest });
+        this._noise(0.05, { type: 'bandpass', freq: 1600, q: 1.6, gain: 0.07, dest });
+        break;
       case 'dryfire':
         this._noise(0.05, { type: 'highpass', freq: 3000, gain: 0.18, dest });
         break;

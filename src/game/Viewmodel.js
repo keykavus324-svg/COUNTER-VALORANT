@@ -205,11 +205,26 @@ export class Viewmodel {
       reloadRot += this.equipOffset * 0.8;
     }
 
+    // CS style "inspect": pull the gun in, roll it and show the finish
+    let inspectRoll = 0;
+    let inspectYaw = 0;
+    let inspectPull = 0;
+    if (state.inspect > 0) {
+      const t = clamp(state.inspect / 1.9, 0, 1);
+      const wave = Math.sin((1 - t) * Math.PI * 2);
+      inspectRoll = wave * 1.15;
+      inspectYaw = wave * 0.55;
+      inspectPull = Math.sin((1 - t) * Math.PI) * 0.085;
+      target.z += inspectPull;
+      target.y += inspectPull * 0.55;
+      target.x -= inspectPull * 0.4;
+    }
+
     this.weaponHolder.position.set(target.x, target.y + reloadY, target.z + reloadX);
     this.weaponHolder.rotation.set(
       -this.kickRot + this.swayY * 1.6 + reloadX * 2,
-      this.swayX * 2.2,
-      reloadRot + this.swayX * 1.4
+      this.swayX * 2.2 + inspectYaw,
+      reloadRot + this.swayX * 1.4 + inspectRoll
     );
 
     // hide gun when fully scoped with a sniper

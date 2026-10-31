@@ -546,3 +546,43 @@ export function whenArtReady(urls, cb) {
   });
 }
 
+
+/* ------------------------------------------------------------------ */
+/* float / wear + StatTrak                                            */
+/* ------------------------------------------------------------------ */
+
+const WEAR_BANDS = [
+  [0.00, 'FACTORY NEW', 'FN'],
+  [0.07, 'MINIMAL WEAR', 'MW'],
+  [0.15, 'FIELD-TESTED', 'FT'],
+  [0.38, 'WELL-WORN', 'WW'],
+  [0.45, 'BATTLE-SCARED', 'BS'],
+];
+
+/** Deterministic 0..1 float for a finish, in the same spirit as CS item floats. */
+export function skinFloat(skin) {
+  if (!skin) return 0;
+  let h = 2166136261;
+  const key = `${skin.id || ''}|${skin.full || skin.name || ''}`;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  // bias towards the middle of the range: most drops are not perfect
+  const r = ((h >>> 0) % 10000) / 10000;
+  const biased = Math.pow(r, 0.7) * 0.62 + 0.01;
+  return Math.round(biased * 10000) / 10000;
+}
+
+export function wearLabel(float) {
+  const f = Math.max(0, Math.min(1, float ?? 0));
+  for (let i = WEAR_BANDS.length - 1; i >= 0; i--) {
+    if (f >= WEAR_BANDS[i][0]) return { label: WEAR_BANDS[i][1], short: WEAR_BANDS[i][2] };
+  }
+  return { label: WEAR_BANDS[0][1], short: WEAR_BANDS[0][2] };
+}
+
+/** StatTrak-style kill counter key used by the profile. */
+export function statTrakKey(skin) {
+  return skin?.id || skin?.uuid || null;
+}

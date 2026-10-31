@@ -6,9 +6,10 @@ import { THEMES, MAPS, MAP_BY_ID, CURRENT_MAP, applyMap, worldToRadar } from '..
 import { BUY_ORDER, BUY_GROUPS, WEAPONS, weaponIconSVG } from '../game/weapons.js';
 import { WALLS, PROPS, SITES, SPAWNS, MAP_BOUNDS } from '../world/mapLayout.js';
 import { WeaponPreview } from './weaponPreview.js';
+import { skinFloat, wearLabel } from '../game/skins.js';
 import { skinThumbnail } from './skinThumb.js';
 import { audio } from '../core/audio.js';
-import { profileSummary, loadProfile, resetProfile } from '../game/profile.js';
+import { profileSummary, loadProfile, resetProfile, statTrakCount } from '../game/profile.js';
 import { WEAPONS as CS_WEAPONS } from '../game/weapons.js';
 import { clamp, fmtTime, distance2D } from '../core/utils.js';
 
@@ -89,6 +90,7 @@ export class UI {
       damageVignette: $('#damage-vignette'), flashOverlay: $('#flash-overlay'),
       buyWeapons: $('#buy-weapons'), buyGear: $('#buy-gear'), buyCredits: $('#buy-credits'),
       buySummary: $('#buy-summary'),
+      weaponStatTrak: $('#weapon-stattrak'),
       careerPanel: $('#career-panel'), careerBody: $('#career-body'), meCareer: $('#me-career'),
       sbAllies: $('#sb-allies'), sbEnemies: $('#sb-enemies'), sbScore: $('#sb-score'),
       agentGrid: $('#agent-grid'), adName: $('#ad-name'), adRole: $('#ad-role'), adDesc: $('#ad-desc'),
@@ -551,6 +553,7 @@ export class UI {
       const skin = eq === 'none' ? null : (skins.find((s) => (s.id || s.uuid) === eq) || skins[0] || null);
       this.el.weaponSkin.textContent = skin ? skin.full.toUpperCase() : '';
       this.el.weaponSkin.style.opacity = skin ? '1' : '0';
+      this.updateStatTrak(skin);
     }
     if (w.type === 'MELEE') {
       this.el.ammoMag.textContent = '—';
@@ -561,6 +564,24 @@ export class UI {
     }
     this.el.ammoPanel.classList.toggle('low', a ? a.mag <= Math.ceil(w.mag * 0.25) : false);
     this.buildWeaponSlots(player);
+  }
+
+  /** StatTrak counter + wear tag for the equipped finish. */
+  updateStatTrak(skin) {
+    const el = this.el.weaponStatTrak;
+    if (!el) return;
+    const count = skin ? statTrakCount(skin.id) : 0;
+    if (!skin || !count) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const wear = wearLabel(skinFloat(skin));
+    el.textContent = `${count} · ${wear.short}`;
+  }
+
+  setStatTrak(total) {
+    const el = this.el.weaponStatTrak;
+    if (!el) return;
+    el.textContent = String(total);
+    el.classList.remove('hidden');
   }
 
   buildWeaponSlots(player) {
@@ -1411,6 +1432,7 @@ export class UI {
         <div class="skin-badge">KUŞANILDI</div>
         <div class="skin-art skin-loading">${weaponIconSVG(weaponId)}</div>
         <div class="skin-name">${skin.full.toUpperCase()}<small>${skin.rarity.toUpperCase()}</small></div>
+        <div class="skin-meta"><span>${wearLabel(skinFloat(skin)).short} · ${skinFloat(skin).toFixed(3)}</span>${statTrakCount(skin.id) ? `<span class="st">${statTrakCount(skin.id)} ST</span>` : ''}</div>
       </button>`;
     }).join('');
 

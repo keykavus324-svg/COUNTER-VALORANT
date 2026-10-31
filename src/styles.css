@@ -713,3 +713,19 @@ input[type="checkbox"] { accent-color: var(--red); }
 }
 .me-career span { font-size: 9px; letter-spacing: .24em; color: var(--red); }
 .me-career b { color: var(--text); font-size: 14px; margin-left: 4px; }
+
+/* StatTrak badge */
+.stattrak {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 3px;
+  padding: 1px 6px 1px 5px; border-radius: 3px;
+  background: rgba(255,120,40,.16); border: 1px solid rgba(255,140,60,.55);
+  color: #ffb066; font-size: 9px; letter-spacing: .16em; font-weight: 700;
+}
+.stattrak.hidden { display: none; }
+.stattrak::before { content: 'ST'; font-size: 8px; opacity: .85; }
+.skin-meta { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 3px; }
+.skin-meta span {
+  font-size: 8px; letter-spacing: .14em; padding: 1px 5px; border-radius: 3px;
+  background: rgba(255,255,255,.06); color: var(--muted);
+}
+.skin-meta span.st { background: rgba(255,140,60,.18); color: #ffb066; }

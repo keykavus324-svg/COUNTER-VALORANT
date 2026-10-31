@@ -35,6 +35,7 @@ export const EMPTY_PROFILE = Object.freeze({
   clutchWins: 0,
   maps: {},
   weapons: {},
+  stattrak: {},
   history: [],
 });
 
@@ -47,11 +48,12 @@ function sanitise(raw) {
   const base = { ...EMPTY_PROFILE };
   if (!raw || typeof raw !== 'object') return base;
   for (const key of Object.keys(EMPTY_PROFILE)) {
-    if (['maps', 'weapons', 'history', 'createdAt', 'version'].includes(key)) continue;
+    if (['maps', 'weapons', 'stattrak', 'history', 'createdAt', 'version'].includes(key)) continue;
     base[key] = num(raw[key]);
   }
   base.maps = raw.maps && typeof raw.maps === 'object' ? raw.maps : {};
   base.weapons = raw.weapons && typeof raw.weapons === 'object' ? raw.weapons : {};
+  base.stattrak = raw.stattrak && typeof raw.stattrak === 'object' ? raw.stattrak : {};
   base.history = Array.isArray(raw.history) ? raw.history.slice(0, HISTORY_LIMIT) : [];
   base.createdAt = num(raw.createdAt) || Date.now();
   base.version = 2;
@@ -211,4 +213,21 @@ export function profileSummary(p = loadProfile()) {
     history: p.history,
     maps: p.maps,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* StatTrak                                                           */
+/* ------------------------------------------------------------------ */
+/** Increase the kill counter of one finish (StatTrak™ style). */
+export function bumpStatTrak(skinId, by = 1) {
+  if (!skinId) return 0;
+  const p = loadProfile();
+  p.stattrak[skinId] = num(p.stattrak[skinId]) + by;
+  saveProfile(p);
+  return p.stattrak[skinId];
+}
+
+export function statTrakCount(skinId) {
+  if (!skinId) return 0;
+  return num(loadProfile().stattrak[skinId]);
 }

@@ -8,7 +8,7 @@ import { Actor, ACTOR_RADIUS, ACTOR_HEIGHT } from './actor.js';
 import { getWeapon, WEAPONS, BUY_ORDER, BUY_GROUPS } from './weapons.js';
 import { AGENTS, AGENT_LIST } from './agents.js';
 import { audio } from '../core/audio.js';
-import { recordMatch, loadProfile, profileSummary } from './profile.js';
+import { recordMatch, loadProfile, profileSummary, bumpStatTrak } from './profile.js';
 import { Grenade, GRENADE_TUNING } from './grenade.js';
 import { clamp, rand, choice, shuffle, rayBoxes, boxFromCenter, resolveCircleBoxXZ, distance2D, angleDiff } from '../core/utils.js';
 import { PLANT_SPOTS, HOLD_SPOTS, SPAWNS, SITES, MAP_BOUNDS, ATTACK_PATHS, CURRENT_MAP } from '../world/mapLayout.js';
@@ -403,6 +403,7 @@ export class Game {
       case 'Digit2': p.switchSlot(2); break;
       case 'Digit3': p.switchSlot(3); break;
       case 'KeyF': this.input.interact = true; break;
+      case 'KeyV': this.inspectWeapon(); break;
       case 'KeyQ': p.castAbility('Q'); break;
       case 'KeyE': p.castAbility('E'); break;
       case 'KeyC': p.castAbility('C'); break;
@@ -769,6 +770,15 @@ export class Game {
     this.startRound();
   }
 
+  /** V — inspect the equipped weapon (CS style turntable in first person). */
+  inspectWeapon() {
+    const p = this.player;
+    if (!p?.alive || p.inspectCooldown > 0 || p.reloadTimer > 0 || this.matchOver) return;
+    p.inspectTimer = 1.9;
+    p.inspectCooldown = 2.4;
+    audio.play('weapon_inspect', { volume: 0.35 });
+  }
+
   /* ================================================================ */
   /* physics helpers                                                   */
   /* ================================================================ */
@@ -1030,7 +1040,14 @@ export class Game {
     if (attacker && attacker !== victim) {
       attacker.kills++;
       attacker.roundKills++;
-      if (attacker.isPlayer) this.weaponKills[weaponId] = (this.weaponKills[weaponId] || 0) + 1;
+      if (attacker.isPlayer) {
+        this.weaponKills[weaponId] = (this.weaponKills[weaponId] || 0) + 1;
+        const skinId = this.settings?.skins?.[weaponId];
+        if (skinId && skinId !== 'none') {
+          const total = bumpStatTrak(skinId, 1);
+          this.ui.setStatTrak?.(total);
+        }
+      }
       attacker.credits = Math.min(16000, attacker.credits + 300);
       attacker.addUltPoints(1);
       if (attacker.isPlayer) {
