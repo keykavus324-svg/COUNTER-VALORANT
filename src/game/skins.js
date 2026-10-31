@@ -120,33 +120,222 @@ export function paletteFor(skinName) {
   return hit || DEFAULT_PALETTE;
 }
 
-/** Recolour a gun model with the skin palette (no texture needed). */
+/* ------------------------------------------------------------------ */
+/* procedural paint jobs (work with zero network)                      */
+/* ------------------------------------------------------------------ */
+const patternCache = new Map();
+
+/** cheap deterministic hash so each skin family gets its own motif */
+function skinSeed(name) {
+  let h = 2166136261;
+  for (let i = 0; i < (name || '').length; i++) {
+    h ^= name.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+/**
+ * Paints a tileable canvas texture for a skin: base colour, family motif and
+ * trim. This is what the guns wear when the CDN renders are unavailable, so the
+ * weapons still look like painted Valorant skins instead of grey boxes.
+ */
+export function skinPatternTexture(skin) {
+  if (!skin) return null;
+  const key = `${skin.name}|${skin.uuid}`;
+  if (patternCache.has(key)) return patternCache.get(key);
+
+  const size = 256;
+  let c;
+  try {
+    c = document.createElement('canvas');
+    c.width = size; c.height = size;
+  } catch { patternCache.set(key, null); return null; }
+  const ctx = c.getContext?.('2d');
+  if (!ctx) { patternCache.set(key, null); return null; }
+
+  const pal = paletteFor(skin.name);
+  const seed = skinSeed(skin.name);
+  const motif = seed % 6;
+
+  ctx.fillStyle = pal.body;
+  ctx.fillRect(0, 0, size, size);
+
+  // soft vertical sheen so flat colours do not look like plastic
+  const grad = ctx.createLinearGradient(0, 0, 0, size);
+  grad.addColorStop(0, 'rgba(255,255,255,0.16)');
+  grad.addColorStop(0.45, 'rgba(255,255,255,0.02)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.30)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.strokeStyle = pal.trim;
+  ctx.fillStyle = pal.accent;
+  ctx.lineWidth = 4;
+
+  if (motif === 0) {
+    // hex / tech weave  (Glitchpop, RGX, Ion ...)
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = pal.trim;
+    ctx.lineWidth = 2;
+    for (let y = 0; y < size + 32; y += 32) {
+      for (let x = 0; x < size + 32; x += 36) {
+        const ox = (y / 32) % 2 ? 18 : 0;
+        ctx.beginPath();
+        for (let k = 0; k < 6; k++) {
+          const a = (Math.PI / 3) * k;
+          const px = x + ox + Math.cos(a) * 17;
+          const py = y + Math.sin(a) * 17;
+          k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = pal.accent;
+    ctx.globalAlpha = 0.5;
+    for (let i = 0; i < 5; i++) {
+      ctx.fillRect(0, 24 + i * 54, size, 3);
+    }
+    ctx.globalAlpha = 1;
+  } else if (motif === 1) {
+    // diagonal racing bands (Prime, Sovereign, Aristo ...)
+    ctx.save();
+    ctx.translate(size / 2, size / 2);
+    ctx.rotate(-Math.PI / 5);
+    ctx.globalAlpha = 0.55;
+    for (let i = -4; i <= 4; i++) {
+      ctx.fillRect(-size, i * 34, size * 2, 9);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = pal.trim;
+    for (let i = -4; i <= 4; i++) {
+      ctx.fillRect(-size, i * 34 + 11, size * 2, 2);
+    }
+    ctx.restore();
+  } else if (motif === 2) {
+    // flame / brush spikes (Elderflame, Ruination ...)
+    ctx.globalAlpha = 0.6;
+    for (let i = 0; i < 26; i++) {
+      const x = (i * 41 + seed % 37) % size;
+      const h = 40 + ((i * 53 + seed) % 110);
+      ctx.beginPath();
+      ctx.moveTo(x, size);
+      ctx.quadraticCurveTo(x + 22, size - h * 0.55, x + 10, size - h);
+      ctx.quadraticCurveTo(x - 14, size - h * 0.5, x, size);
+      ctx.fillStyle = i % 3 ? pal.accent : pal.trim;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (motif === 3) {
+    // pixel glitch (Glitchpop, Spectrum ...)
+    for (let i = 0; i < 70; i++) {
+      const w = 6 + ((seed + i * 97) % 44);
+      const h = 3 + ((seed + i * 31) % 9);
+      ctx.fillStyle = i % 2 ? pal.accent : pal.trim;
+      ctx.globalAlpha = 0.25 + ((i % 5) * 0.12);
+      ctx.fillRect((i * 61 + seed) % size, (i * 37 + seed) % size, w, h);
+    }
+    ctx.globalAlpha = 1;
+  } else if (motif === 4) {
+    // camo blobs (Forsaken, Xenohunter, Reeve ...)
+    for (let i = 0; i < 30; i++) {
+      const x = (i * 71 + seed) % size;
+      const y = (i * 113 + seed * 3) % size;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 18 + (i % 4) * 9, 10 + (i % 3) * 8, (i * 0.7) % Math.PI, 0, Math.PI * 2);
+      ctx.fillStyle = i % 2 ? pal.accent : pal.trim;
+      ctx.globalAlpha = 0.28;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    // oni wave / magepunk circuitry
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = pal.accent;
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      for (let x = 0; x <= size; x += 8) {
+        const y = size * 0.5 + Math.sin(x * 0.045 + i * 0.9 + seed * 0.001) * 46 + i * 6;
+        x ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = pal.trim;
+    ctx.fillRect(0, 0, size, 6);
+    ctx.fillRect(0, size - 6, size, 6);
+  }
+
+  // metallic edge shading top / bottom
+  const edge = ctx.createLinearGradient(0, 0, 0, 12);
+  edge.addColorStop(0, 'rgba(0,0,0,0.55)');
+  edge.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = edge;
+  ctx.fillRect(0, 0, size, 12);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  patternCache.set(key, tex);
+  return tex;
+}
+
+/** Recolour a gun model with the skin palette and its painted pattern. */
 export function applySkinPalette(model, skin, strength = 0.85) {
   if (!model || !skin) return;
   const pal = paletteFor(skin.name);
-  const body = new THREE.Color(pal.body);
   const accent = new THREE.Color(pal.accent);
   const trim = new THREE.Color(pal.trim);
+  const pattern = skinPatternTexture(skin);
   let i = 0;
   model.traverse((o) => {
     if (!o.isMesh || o.userData.cvSkinDecalMesh) return;
     if (!o.userData.cvOrigMat) {
       o.userData.cvOrigMat = o.material;
-      o.material = o.material.clone();
-      o.material.userData = { ...(o.material.userData || {}), cvPaletteTarget: true };
+      o.material = Array.isArray(o.material) ? o.material.map((m) => m.clone()) : o.material.clone();
+      const arr = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of arr) m.userData = { ...(m.userData || {}), cvPaletteTarget: true };
     }
-    const mat = o.material;
-    if (!mat || !mat.color) return;
-    const target = i % 5 === 0 ? accent : (i % 3 === 0 ? trim : body);
-    const orig = new THREE.Color(o.userData.cvOrigMat.color || 0xffffff);
-    const blended = orig.clone().lerp(target, strength);
-    mat.color.copy(blended);
-    if ('metalness' in mat) mat.metalness = Math.min(1, (mat.metalness ?? 0.4) + 0.15);
-    if ('roughness' in mat) mat.roughness = Math.max(0.18, (mat.roughness ?? 0.6) - 0.12);
-    if (mat.emissive) {
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const wantMap = !o.userData.cvSkipSkinMap && pattern;
+    for (const mat of mats) {
+      if (!mat) continue;
       const isAccent = i % 5 === 0;
-      mat.emissive.copy(isAccent ? accent : new THREE.Color(0x000000));
-      mat.emissiveIntensity = isAccent ? 0.55 : 0;
+      if (mat.color) {
+        if (wantMap) {
+          // the canvas already carries the colours; the per-mesh tint keeps
+          // receiver / grip / barrel visually distinct instead of one flat wash
+          const shade = isAccent ? 1.06 : (i % 3 === 0 ? 0.84 : 1.0);
+          mat.color.setRGB(1, 1, 1).multiplyScalar(shade)
+            .lerp(isAccent ? accent : trim, isAccent ? 0.22 : 0.06);
+        } else {
+          const target = isAccent ? accent : (i % 3 === 0 ? trim : new THREE.Color(pal.body));
+          const orig = new THREE.Color(o.userData.cvOrigMat?.color || 0xffffff);
+          mat.color.copy(orig.clone().lerp(target, strength));
+        }
+      }
+      if (wantMap && !mat.map) {
+        // tighter weave on the small parts, broad pattern on the receiver
+        const t = i % 4 === 0 ? pattern.clone() : pattern;
+        if (t !== pattern) {
+          t.needsUpdate = true;
+          t.repeat.set(1.6, 1.6);
+        }
+        mat.map = t;
+        mat.needsUpdate = true;
+      }
+      if ('metalness' in mat) mat.metalness = Math.min(1, (mat.metalness ?? 0.4) + 0.22);
+      if ('roughness' in mat) mat.roughness = Math.max(0.2, (mat.roughness ?? 0.6) - 0.14);
+      if (mat.emissive) {
+        mat.emissive.copy(isAccent ? accent : new THREE.Color(0x000000));
+        mat.emissiveIntensity = isAccent ? 1.15 : 0;
+      }
     }
     i++;
   });
@@ -158,9 +347,11 @@ export function applySkinPalette(model, skin, strength = 0.85) {
 function clearDecals(model) {
   const old = model.userData[DECAL_FLAG];
   if (!old) return;
-  for (const mesh of old) {
-    mesh.parent?.remove(mesh);
-    mesh.geometry?.dispose();
+  for (const node of old) {
+    node.traverse?.((o) => {
+      if (o.isMesh) o.geometry?.dispose();
+    });
+    node.parent?.remove(node);
   }
   model.userData[DECAL_FLAG] = null;
 }
@@ -170,55 +361,75 @@ function clearDecals(model) {
  * The art is scaled to the weapon's own bounding box so the silhouette lines up
  * with the barrel / stock / magazine of the procedural model.
  */
-export function applySkinDecal(model, skin, { opacity = 1 } = {}) {
+export function applySkinDecal(model, skin, { opacity = 1, texture = null } = {}) {
   if (!model || !skin) return false;
-  const tex = getSkinTexture(skin.uuid);
+  const tex = texture || getSkinTexture(skin.uuid);
   if (!tex) return false;
   clearDecals(model);
 
-  model.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(model);
+  // The box must be measured with the model's own transform removed, otherwise
+  // the viewmodel scale (0.9x) shrinks the offsets and buries the artwork
+  // inside the receiver — which is exactly why skins used to be invisible.
+  const probe = model.clone(true);
+  probe.position.set(0, 0, 0);
+  probe.quaternion.identity();
+  probe.scale.setScalar(1);
+  probe.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(probe);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
-  if (!Number.isFinite(size.z) || size.z <= 0 || size.y <= 0) return false;
+  if (!(size.z > 0.05) || !(size.y > 0.02)) return false;
 
-  const aspect = tex.userData.aspect || 3.2;
-  // fit inside the gun's silhouette
-  let h = size.y * 0.94;
+  const aspect = tex.userData?.aspect || 3.2;
+  const art = new THREE.Group();
+  art.userData.cvSkinDecal = true;
+  let h = size.y * 0.9;
   let w = h * aspect;
-  if (w > size.z * 1.04) { w = size.z * 1.04; h = w / aspect; }
+  if (w > size.z * 1.02) { w = size.z * 1.02; h = w / aspect; }
 
   const geo = new THREE.PlaneGeometry(w, h);
   const mat = new THREE.MeshStandardMaterial({
     map: tex,
     transparent: true,
-    alphaTest: 0.06,
+    alphaTest: 0.05,
     opacity,
-    roughness: 0.45,
-    metalness: 0.25,
+    roughness: 0.4,
+    metalness: 0.3,
     emissive: new THREE.Color(0xffffff),
     emissiveMap: tex,
-    emissiveIntensity: 0.12,
-    side: THREE.FrontSide,
-    depthWrite: true,
+    emissiveIntensity: 0.16,
+    side: THREE.DoubleSide,
     polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
   });
 
+  const clearance = size.x * 0.04 + 0.006;   // sit just proud of the flank
   const meshes = [];
   for (const side of [1, -1]) {
     const m = new THREE.Mesh(geo, mat);
-    m.position.set(center.x + side * (size.x / 2 + 0.004), center.y, center.z);
+    m.position.set(center.x + side * (size.x / 2 + clearance), center.y, center.z);
     m.rotation.y = side > 0 ? Math.PI / 2 : -Math.PI / 2;
-    // the source art faces left; mirror it on the far flank so both sides read
-    if (side < 0) m.scale.x = -1;
+    if (side < 0) m.scale.x = -1;   // mirror on the far flank
     m.renderOrder = 6;
-    m.matrixAutoUpdate = true;
-    model.add(m);
+    m.userData.cvSkinDecalMesh = true;
+    art.add(m);
     meshes.push(m);
   }
-  model.userData[DECAL_FLAG] = meshes;
+
+  // a painted spine along the top so the skin reads from every angle
+  const spine = new THREE.Mesh(
+    new THREE.PlaneGeometry(Math.max(size.x * 0.5, 0.02), w * 0.96),
+    mat,
+  );
+  spine.rotation.x = -Math.PI / 2;
+  spine.position.set(center.x, box.max.y + 0.004, center.z);
+  spine.renderOrder = 6;
+  spine.userData.cvSkinDecalMesh = true;
+  art.add(spine);
+
+  model.add(art);
+  model.userData[DECAL_FLAG] = [art];
   return true;
 }
 

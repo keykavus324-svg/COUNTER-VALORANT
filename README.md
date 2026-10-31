@@ -120,6 +120,19 @@ Split, Icebox, Lotus, Sunset, Pearl, Breeze, Fracture, Abyss) resmi görseli ve
 kısa tanıtımı yer alır. Ana menü ve yükleme ekranının arka planı da gerçek harita
 görselleriyle döner.
 
+## Silah kaplamaları — nasıl görünür?
+
+Her kaplama üç katmanda uygulanır:
+
+1. **Boya + desen** — kaplamanın paletinden üretilen, ağ gerektirmeyen canvas
+   dokusu (hex, şerit, alev, glitch, kamuflaj, oni dalgası) gövdeye, şarjöre ve
+   namluya farklı tonlarla bindirilir.
+2. **Gerçek render** — valorant-api'den gelen orijinal kaplama görseli, silahın
+   iki yanına ve sırtına bindirilir (CDN erişilebilirse).
+3. **Kuşanma etiketi** — HUD'da silah adının altında aktif kaplamanın adı yazar.
+
+Kasadaki **3D vitrin** kaplamayı seçtiğin an döndürerek gösterir (sürükleyebilirsin).
+
 ## Harita — DUNE (4 tema)
 
 Aynı yerleşim dört farklı görsel kimlikle oynanabilir; **HARİTALAR** ekranından

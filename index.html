@@ -71,6 +71,7 @@
     <!-- weapon / ammo -->
     <div id="ammo-panel">
       <div id="weapon-name">VANDAL</div>
+      <div id="weapon-skin"></div>
       <div id="ammo-numbers"><span id="ammo-mag">25</span><span class="slash">/</span><span id="ammo-reserve">75</span></div>
       <div id="weapon-slots"></div>
     </div>
@@ -327,6 +328,11 @@
     </header>
     <div class="vault-body">
       <aside class="vault-weapons" id="sv-weapons"></aside>
+      <div class="vault-stage" id="sv-stage">
+        <canvas id="sv-canvas"></canvas>
+        <div class="stage-tag"><b id="sv-stage-weapon">VANDAL</b><span id="sv-stage-skin">PRIME</span></div>
+        <div class="stage-hint">sürükleyerek döndür</div>
+      </div>
       <section class="vault-skins" id="sv-skins"></section>
     </div>
     <footer class="vault-foot">

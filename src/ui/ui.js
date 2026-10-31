@@ -5,6 +5,7 @@ import {
 import { THEMES } from '../world/mapLayout.js';
 import { BUY_ORDER, WEAPONS, weaponIconSVG } from '../game/weapons.js';
 import { WALLS, PROPS, SITES, SPAWNS, MAP_BOUNDS } from '../world/mapLayout.js';
+import { WeaponPreview } from './weaponPreview.js';
 import { audio } from '../core/audio.js';
 import { clamp, fmtTime, distance2D } from '../core/utils.js';
 
@@ -69,7 +70,7 @@ export class UI {
       scoreboard: $('#scoreboard'), matchEnd: $('#match-end'), clickToPlay: $('#click-to-play'),
       hpFill: $('#hp-fill'), hpText: $('#hp-text'), armorFill: $('#armor-fill'), armorText: $('#armor-text'),
       credits: $('#credits'), ammoMag: $('#ammo-mag'), ammoReserve: $('#ammo-reserve'),
-      ammoPanel: $('#ammo-panel'), weaponName: $('#weapon-name'), weaponSlots: $('#weapon-slots'),
+      ammoPanel: $('#ammo-panel'), weaponName: $('#weapon-name'), weaponSkin: $('#weapon-skin'), weaponSlots: $('#weapon-slots'),
       scoreAlly: $('#score-ally'), scoreEnemy: $('#score-enemy'), timer: $('#timer'),
       phaseLabel: $('#phase-label'), roundPips: $('#round-pips'), killfeed: $('#killfeed'),
       eventFeed: $('#event-feed'), banner: $('#round-banner'), bannerSub: $('#round-banner .rb-sub'),
@@ -90,6 +91,7 @@ export class UI {
       // authentic art
       menuArt: $('#menu-art'), loadArt: $('#load-art'), adArtImg: $('#ad-art-img'),
       skinVault: $('#skin-vault'), svWeapons: $('#sv-weapons'), svSkins: $('#sv-skins'),
+      svCanvas: $('#sv-canvas'), svStageSkin: $('#sv-stage-skin'), svStageWeapon: $('#sv-stage-weapon'),
       svHint: $('#sv-hint'), vaultStatus: $('#vault-status'),
       mapsGallery: $('#maps-gallery'), mapsGrid: $('#maps-grid'),
       btnSkins: $('#btn-skins'), btnMaps: $('#btn-maps'), btnVaultBack: $('#btn-vault-back'),
@@ -484,6 +486,13 @@ export class UI {
     if (!w) return;
     const a = player.ammo[w.id];
     this.el.weaponName.textContent = w.name;
+    if (this.el.weaponSkin) {
+      const skins = WEAPON_SKINS[w.id] || [];
+      const eq = (this.settings.skins || {})[w.id];
+      const skin = eq === 'none' ? null : (skins.find((s) => s.uuid === eq) || skins[0] || null);
+      this.el.weaponSkin.textContent = skin ? skin.name.toUpperCase() : '';
+      this.el.weaponSkin.style.opacity = skin ? '1' : '0';
+    }
     if (w.type === 'MELEE') {
       this.el.ammoMag.textContent = '—';
       this.el.ammoReserve.textContent = '—';
@@ -1045,6 +1054,7 @@ export class UI {
       this.settings.skins[this.vaultWeapon] = 'none';
       this.save();
       this.renderVaultSkins(this.vaultWeapon);
+      this._refreshStage();
     });
 
     // is the CDN reachable? (offline → procedural art stays, cards show a warning)
@@ -1151,9 +1161,42 @@ export class UI {
     if (open) {
       this.renderVaultWeapons();
       this.renderVaultSkins(this.vaultWeapon);
+      this._startStage();
+      this._refreshStage();
+    } else {
+      this.stage?.stop();
     }
     if (open) this.el.mainMenu.classList.add('hidden');
     else this.el.mainMenu.classList.remove('hidden');
+  }
+
+  /** lazily spin up the 3D turntable (one extra WebGL context, only in the vault) */
+  _startStage() {
+    if (!this.el.svCanvas || this.stage) { this.stage?.start(); return; }
+    // no WebGL (headless tests, very old GPU) → keep the vault fully usable
+    if (typeof window.WebGLRenderingContext === 'undefined') return;
+    const ctx = this.el.svCanvas.getContext?.('webgl2') || this.el.svCanvas.getContext?.('webgl');
+    if (!ctx) return;
+    try {
+      this.stage = new WeaponPreview(this.el.svCanvas);
+      this.stage.start();
+    } catch (err) {
+      console.warn('[vault] 3D önizleme başlatılamadı', err);
+      this.stage = null;
+    }
+  }
+
+  /** push the current weapon + skin into the turntable */
+  _refreshStage() {
+    if (!this.stage) return;
+    const weaponId = this.vaultWeapon;
+    const skins = WEAPON_SKINS[weaponId] || [];
+    const equipped = (this.settings.skins || {})[weaponId];
+    const activeUuid = equipped === 'none' ? null : (equipped || skins[0]?.uuid);
+    const skin = skins.find((s) => s.uuid === activeUuid) || null;
+    this.stage.setWeapon(weaponId, this.settings.skins || {});
+    if (this.el.svStageWeapon) this.el.svStageWeapon.textContent = weaponId.toUpperCase();
+    if (this.el.svStageSkin) this.el.svStageSkin.textContent = skin ? skin.name : 'VARSAYILAN KAPLAMA';
   }
 
   renderVaultWeapons() {
@@ -1171,6 +1214,7 @@ export class UI {
         this.vaultWeapon = btn.dataset.wpn;
         this.renderVaultWeapons();
         this.renderVaultSkins(this.vaultWeapon);
+        this._refreshStage();
       });
     });
   }
@@ -1208,6 +1252,7 @@ export class UI {
           this.el.svHint.textContent = `${skin?.name || 'Kaplama'} kuşanıldı — maçta ${weaponId.toUpperCase()} aldığında uygulanır.`;
         }
         this.renderVaultSkins(weaponId);
+        this._refreshStage();
         this._buildWeaponArt();
       });
     });
