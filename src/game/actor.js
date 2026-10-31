@@ -120,11 +120,19 @@ export class Actor {
   /* ---------------------------------------------------------------- */
   /* weapons                                                           */
   /* ---------------------------------------------------------------- */
+  /** keep the first person viewmodel in sync (player only) */
+  syncViewmodel() {
+    if (!this.isPlayer) return;
+    const id = this.slots[this.currentSlot];
+    if (id) this.game?.viewmodel?.setWeapon(id);
+  }
+
   equipSlot(slot) {
     if (!this.slots[slot] || this.currentSlot === slot || !this.alive) return false;
     this.currentSlot = slot;
     const w = getWeapon(this.slots[slot]);
     this.character.setWeapon(w.id);
+    this.syncViewmodel();
     this.equipTimer = Math.min(0.55, 0.24 + (w.type === 'MELEE' ? 0 : 0.1));
     this.reloadTimer = 0;
     this.ads = false;
@@ -145,6 +153,7 @@ export class Actor {
     }
     this.ammo[id] = { mag: w.mag, reserve: w.reserve };
     this.character.setWeapon(id);
+    this.syncViewmodel();
     this.equipTimer = 0.3;
     this.reloadTimer = 0;
   }

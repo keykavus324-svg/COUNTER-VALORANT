@@ -163,10 +163,11 @@ game.onKill = (victim, attacker, weaponId, headshot) => {
   origOnKill(victim, attacker, weaponId, headshot);
 };
 
+const stalls = new Map();
 for (let i = 0; i < steps; i++) {
   if (game.roundNumber !== lastRound) {
     lastRound = game.roundNumber;
-    if (player.spikeCarrier) {
+    if (player.spikeCarrier && !process.env.PLAYER_SPIKE) {
       player.spikeCarrier = false;
       const bot = game.actors.find((a) => a.team === game.attackingTeam && !a.isPlayer && a.alive);
       if (bot) { bot.spikeCarrier = true; game.spike.carrier = bot; }
@@ -184,9 +185,32 @@ for (let i = 0; i < steps; i++) {
   if (game.phase !== lastPhase) {
     phaseTally[game.phase] = (phaseTally[game.phase] || 0) + 1;
     if (game.phase === 'roundEnd' || game.phase === 'matchEnd') {
-      roundLog.push(`${game.roundNumber}: ${game.scores.ally}-${game.scores.enemy} (${game.roundWinner || '-'})`);
+      roundLog.push(`${game.roundNumber}: ${game.scores.ally}-${game.scores.enemy} (${game.roundWinner || '-'} / ${game.roundHistory.at(-1)?.reason || '?'})`);
     }
     lastPhase = game.phase;
+  }
+  // stuck-bot detector: a bot that stops making progress while free to move
+  if (i % 15 === 0) {
+    for (const a of game.actors) {
+      if (a.isPlayer || !a.alive) continue;
+      const st = stalls.get(a) || { last: null, since: game.time, worst: null, at: null, goal: null };
+      if (!st.last) { st.last = { x: a.pos.x, z: a.pos.z }; st.since = game.time; stalls.set(a, st); continue; }
+      const moved = Math.hypot(a.pos.x - st.last.x, a.pos.z - st.last.z);
+      const goal = a.moveTarget || a.holdSpot;
+      const nearGoal = goal ? Math.hypot(a.pos.x - goal.x, a.pos.z - goal.z) < 2.5 : false;
+      if (moved < 0.5 && game.phase === 'live' && a.state !== 'engage' && !nearGoal) {
+        const idle = game.time - st.since;
+        if (idle > 3 && (!st.worst || idle > st.worst)) {
+          st.worst = idle;
+          st.at = { x: a.pos.x, z: a.pos.z, round: game.roundNumber };
+          st.goal = a.moveTarget ? { x: a.moveTarget.x, z: a.moveTarget.z } : (a.holdSpot ? { x: a.holdSpot.x, z: a.holdSpot.z } : null);
+        }
+      } else if (moved >= 0.5) {
+        st.last = { x: a.pos.x, z: a.pos.z };
+        st.since = game.time;
+      }
+      stalls.set(a, st);
+    }
   }
   if (game.matchOver && game.phase === 'matchEnd') break;
   if (process.env.VERBOSE && i % 300 === 0) {
@@ -207,5 +231,17 @@ const alive = game.actors.map((a) => `${a.name}(${a.team},${a.agentId}) hp=${Mat
 console.log('actors:', alive.join(', '));
 console.log('player K/D:', player.kills, player.deaths, 'damage:', Math.round(player.damageDealt));
 console.log('phase tally:', phaseTally);
+const stalled = [...stalls.entries()]
+  .filter(([, st]) => st.worst && st.worst > 3)
+  .sort((a, b) => b[1].worst - a[1].worst)
+  .slice(0, 6);
+if (stalled.length) {
+  console.log('stalls (bot idle >3s during live, not fighting):');
+  for (const [a, st] of stalled) {
+    console.log(`   ${a.name.padEnd(6)} ${st.worst.toFixed(1)}s at ${st.at.x.toFixed(1)},${st.at.z.toFixed(1)} r${st.at.round} goal=${st.goal ? st.goal.x.toFixed(1) + ',' + st.goal.z.toFixed(1) : '-'}`);
+  }
+} else {
+  console.log('stalls: none');
+}
 console.log('runtime errors:', errors);
 process.exit(errors ? 1 : 0);

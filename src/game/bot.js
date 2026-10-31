@@ -305,7 +305,7 @@ export class Bot extends Actor {
     if (this.state === 'investigate') return;
 
     // spike is planted → everybody converges / defends / defuses
-    if (spike.planted) {
+    if (spike.state === 'planted') {
       const defenders = this.team !== game.attackingTeam;
       if (defenders) {
         if (this.state === 'engage') return;
@@ -347,6 +347,22 @@ export class Bot extends Actor {
         }
         this.route = null;
       }
+      // escort the human carrier so the plant is actually covered
+      if (!this.spikeCarrier && game.escortBot === this && game.player.alive && game.player.spikeCarrier) {
+        const d = distance2D(this.pos, game.player.pos);
+        if (d > 7) {
+          this.gotoPoint({ x: game.player.pos.x, z: game.player.pos.z }, dt, { speed: 1.02 });
+          this.lookAround(dt);
+          return;
+        }
+        if (d > 3.2) {
+          this.stopMoving();
+          this.facePoint(game.player.pos, dt, 3);
+          this.lookAround(dt);
+          return;
+        }
+      }
+
       // dropped spike nearby? go pick it up
       if (game.spike.state === 'dropped' && !game.spike.carrier) {
         if (game.spikeRetriever === this || distance2D(this.pos, game.spike.pos) < 16) {

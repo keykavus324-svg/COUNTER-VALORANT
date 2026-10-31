@@ -62,6 +62,10 @@ export class Game {
       state: 'carried', pos: new THREE.Vector3(), carrier: null,
       timer: SPIKE_TIME, beepTimer: 1, site: 'A', plantProgress: 0, defuseProgress: 0,
       defuserId: null, dropTime: 0,
+      // convenience flags used all over the AI/UI code
+      get planted() { return this.state === 'planted'; },
+      get dropped() { return this.state === 'dropped'; },
+      get carried() { return this.state === 'carried'; },
     };
     this.currentPlantSpot = { x: 21, z: -22 };
     this.spectateTarget = null;
@@ -266,6 +270,12 @@ export class Game {
       } else {
         this.ui.showClickToPlay(false);
       }
+    });
+
+    // some browsers refuse pointer lock without a fresh gesture: fall back to the
+    // "click to play" prompt instead of leaving the player without mouse look
+    this._on(document, 'pointerlockerror', () => {
+      if (this.running && !this.matchOver && !this.buyMenuOpen) this.ui.showClickToPlay(true);
     });
 
     this._on(canvas, 'mousedown', (e) => {
@@ -474,6 +484,13 @@ export class Game {
     const defendSpotsB = shuffle([...HOLD_SPOTS.B]);
     const defendSpotsMid = shuffle([...HOLD_SPOTS.mid]);
 
+    // when the human carries the spike, one bot sticks with them as cover
+    this.escortBot = null;
+    if (carrier === this.player) {
+      const mates = this.actors.filter((a) => !a.isPlayer && a.team === this.attackingTeam);
+      this.escortBot = mates[0] || null;
+    }
+
     let attackSpotIdx = 0;
     let defA = 0;
     let defB = 0;
@@ -543,6 +560,7 @@ export class Game {
     // reset actor inventories that were lost? weapons persist like Valorant
     this.player.currentSlot = this.player.slots[1] ? 1 : 2;
     this.player.character.setWeapon(this.player.slots[this.player.currentSlot]);
+    this.player.syncViewmodel();
     this.player.equipTimer = 0.3;
     this.player.credits = Math.max(this.player.credits, 0);
     this.player.ultPoints = this.player.abilityState[Object.keys(this.player.abilityState)[0]]?.ultPoints || 0;

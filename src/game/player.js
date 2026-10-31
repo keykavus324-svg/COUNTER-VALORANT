@@ -44,6 +44,7 @@ export class Player extends Actor {
     this.character.root.visible = false;
     this.character.setWeapon(this.slots[this.currentSlot] || 'classic');
     this.equipTimer = 0.4;
+    this.syncViewmodel?.();
     this.dead = false;
   }
 

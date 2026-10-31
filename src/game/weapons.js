@@ -309,7 +309,9 @@ export function buildWeaponModel(id, viewmodel = true) {
     }
   }
 
-  // muzzle flash anchor glow
+  // muzzle flash / shell anchors live in the gun so they follow every animation
+  muzzle.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0);
+  g.add(muzzle, shellEject);
   g.userData.muzzle = muzzle;
   g.userData.shellEject = shellEject;
   g.userData.mag = magMesh;

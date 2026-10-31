@@ -139,6 +139,8 @@ node tools/navcheck.mjs       # saldırı rotalarının engellere takılmadığ�
 node tools/check-layout.mjs   # tüm hedeflerin erişilebilir olduğunu doğrular
 node tools/uicheck.mjs        # jsdom ile tüm arayüz fonksiyonlarını çalıştırır
 node tools/domcheck.mjs       # ui.js'in istediği DOM id'leri index.html'de var mı
+node tools/scenecheck.mjs     # 3D sahne bütünlüğü: eksik gövde/parça, kafa hitbox hizası
+node tools/silhouette.mjs character blaze   # terminalde ASCII silüet (model kontrolü)
 node tools/headless-sim.mjs   # THREE olmadan 5v5 maç simülasyonu, runtime hata avı
 VERBOSE=1 node tools/headless-sim.mjs 600   # ayrıntılı kill/round logu
 ```

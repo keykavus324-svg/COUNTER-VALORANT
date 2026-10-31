@@ -6,8 +6,23 @@ const canvas = document.getElementById('game-canvas');
 
 let game = null;
 
+/** First launch on a modest machine: start at low quality instead of stuttering. */
+function firstRunSettings() {
+  const settings = { ...DEFAULT_SETTINGS };
+  let saved = null;
+  try {
+    saved = localStorage.getItem('cv-settings-v1');
+  } catch { /* storage blocked */ }
+  if (saved) return settings;
+  const cores = navigator.hardwareConcurrency || 4;
+  const small = Math.min(window.innerWidth, window.innerHeight) < 720;
+  if (cores <= 4 || small) settings.quality = 'low';
+  else if (cores >= 12) settings.quality = 'high';
+  return settings;
+}
+
 const ui = new UI({
-  settings: { ...DEFAULT_SETTINGS },
+  settings: firstRunSettings(),
   onStartMatch: (agentId, settings) => {
     startMatch(agentId, settings);
   },
@@ -49,7 +64,15 @@ function startMatch(agentId, settings) {
         }, 320);
       } catch (err) {
         console.error(err);
-        ui.setLoading(1, 'HATA: ' + err.message);
+        const gl = !!document.createElement('canvas').getContext('webgl2')
+          || !!document.createElement('canvas').getContext('webgl');
+        ui.setLoading(
+          1,
+          gl
+            ? 'HATA: ' + (err?.message || err)
+            : 'WebGL kapalı görünüyor — tarayıcı ayarlarından donanım hızlandırmayı (hardware acceleration) açıp sayfayı yenile.'
+        );
+        ui.showClickToPlay(false);
       }
     }, 120);
   });

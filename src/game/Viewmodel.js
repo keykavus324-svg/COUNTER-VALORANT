@@ -197,7 +197,7 @@ export class Viewmodel {
     this.weaponHolder.position.set(target.x, target.y + reloadY, target.z + reloadX);
     this.weaponHolder.rotation.set(
       -this.kickRot + this.swayY * 1.6 + reloadX * 2,
-      Math.PI + this.swayX * 2.2,
+      this.swayX * 2.2,
       reloadRot + this.swayX * 1.4
     );
 

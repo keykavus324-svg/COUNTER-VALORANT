@@ -77,6 +77,10 @@ export class Character {
     this.mats = [skin, this.fabricMat, primaryMat, secondaryMat, this.darkMat, gearMat, this.armorMat];
 
     const root = new THREE.Group();
+    // the model is authored a bit larger than the collision capsule: scale it so
+    // the visible head sits inside the head hitbox (ACTOR_HEIGHT) and shots line up
+    this.baseScale = 0.88;
+    root.scale.setScalar(this.baseScale);
     this.root = root;
 
     // ---- legs ----
@@ -195,6 +199,9 @@ export class Character {
     weaponMount.rotation.set(0, 0, 0);
     this.weaponMount = weaponMount;
     upper.add(weaponMount);
+
+    // the whole upper body (torso, head, arms, weapon) hangs off the upper group
+    root.add(upper);
 
     root.traverse((o) => {
       if (o.isMesh) {
@@ -319,9 +326,9 @@ export class Character {
     if (this.crouch > 0) {
       this.legR.rotation.x = 0.45;
       this.legL.rotation.x = -0.2;
-      this.root.scale.y = 0.9;
+      this.root.scale.y = this.baseScale * 0.9;
     } else {
-      this.root.scale.y = 1;
+      this.root.scale.y = this.baseScale;
       this.legR.rotation.x = Math.sin(this.walkPhase) * 0.62 * swing;
       this.legL.rotation.x = -Math.sin(this.walkPhase) * 0.62 * swing;
     }
