@@ -144,6 +144,7 @@ export class UI {
     this.el.scoreboard.classList.add('hidden');
     this.el.skinVault?.classList.add('hidden');
     this.el.mapsGallery?.classList.add('hidden');
+    this.stage?.stop();
     document.body.classList.remove('playing');
     this.setMenuStats();
     if (this.stats) {

@@ -13,7 +13,7 @@ export class WeaponPreview {
     this.canvas = canvas;
     this.visible = false;
     this.yaw = -0.55;
-    this.pitch = 0.12;
+    this.pitch = 0.16;
     this.drag = null;
     this.raf = 0;
     this.weaponId = null;
@@ -71,7 +71,7 @@ export class WeaponPreview {
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const longest = Math.max(size.z, size.y, size.x) || 1;
-    const k = 1.5 / longest;
+    const k = 1.18 / longest;
     const wrap = new THREE.Group();
     model.position.sub(center);
     wrap.add(model);
