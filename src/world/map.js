@@ -74,11 +74,11 @@ export class GameMap {
   _buildLights() {
     const { theme, scene } = this;
     // sky dome light + a whisper of ambient keeps shadows from going pure black
-    const hemi = new THREE.HemisphereLight(theme.hemi[0], theme.hemi[1], 0.85);
+    const hemi = new THREE.HemisphereLight(theme.hemi[0], theme.hemi[1], 0.55);
     scene.add(hemi);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.14));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.09));
 
-    const sun = new THREE.DirectionalLight(theme.sun, 2.35);
+    const sun = new THREE.DirectionalLight(theme.sun, 2.9);
     sun.position.set(52, 66, 38);
     sun.target.position.set(0, 0, 0);
     scene.add(sun.target);
@@ -100,12 +100,12 @@ export class GameMap {
     scene.add(sun);
 
     // cool bounce light from the opposite side: separates perpendicular walls
-    const fill = new THREE.DirectionalLight(0xbcd2e8, 0.5);
+    const fill = new THREE.DirectionalLight(0xbcd2e8, 0.34);
     fill.position.set(-60, 34, -48);
     scene.add(fill);
     this.fill = fill;
 
-    scene.fog = new THREE.FogExp2(_c.set(theme.sky[2]).getHex(), 0.0042);
+    scene.fog = new THREE.FogExp2(_c.set(theme.sky[2]).getHex(), 0.003);
 
     this._buildEnvironment();
   }
@@ -196,38 +196,142 @@ export class GameMap {
       metalness: 0.02,
       normalScale: 1.15,
     });
-    // Height variation: the radar mask gives every block the same extrusion,
-    // which reads as a maze of identical slabs. Blocks near the map edge grow
-    // into buildings, small blocks stay low cover, middling ones vary.
+    // Height variation. The radar mask extrudes every block to the same height,
+    // which reads as a maze of identical slabs. Keep the range believable:
+    // real CS sightlines live under ~7 m, so nothing becomes a monolith.
     const cx = (MAP_BOUNDS.minX + MAP_BOUNDS.maxX) / 2;
     const cz = (MAP_BOUNDS.minZ + MAP_BOUNDS.maxZ) / 2;
     const halfSpan = Math.max(
       (MAP_BOUNDS.maxX - MAP_BOUNDS.minX),
       (MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ),
     ) / 2 || 1;
-    // (built into a copy: the baked arrays must stay pristine)
     const scaledWalls = WALLS.map(([x, z, w, d, h, kind]) => {
       const dist = Math.hypot(x - cx, z - cz) / halfSpan;   // 0 centre … 1 edge
       const area = w * d;
       const seed = (Math.abs((x * 13.7 + z * 7.3) | 0) % 100) / 100;
       let mul;
-      if (area < 4) mul = 0.55 + seed * 0.25;               // low cover
-      else if (area < 26) mul = 0.85 + seed * 0.5 + dist * 0.25;
-      else mul = 1.15 + seed * 0.7 + dist * 1.15;            // building block
-      return [x, z, w, d, +(Math.min(h * mul, 16)).toFixed(2), kind];
+      if (area < 4) mul = 0.5 + seed * 0.2;                 // waist-high cover
+      else if (area < 26) mul = 0.8 + seed * 0.35 + dist * 0.15;
+      else mul = 1.0 + seed * 0.35 + dist * 0.45;           // building block
+      return [x, z, w, d, +(Math.min(h * mul, 8.4)).toFixed(2), kind];
     });
     this.wallList = scaledWalls;
 
-    const geo = mergedBoxGeometry(
-      scaledWalls.map(([x, z, w, d, h]) => ({ x, z, w, d, h })),
-      { tile: 3.1, topShade: true },
+    /* --- architectural trim: buttresses, dado bands, cornices ---------- */
+    const trims = [];
+    for (const [x, z, w, d, h] of scaledWalls) {
+      const long = Math.max(w, d);
+      const short = Math.min(w, d);
+      const alongX = w >= d;
+      // pilasters break up any wall longer than ~6 m
+      if (long > 6 && h > 2.4) {
+        const count = Math.min(6, Math.floor(long / 5));
+        for (let i = 0; i < count; i++) {
+          const t = (i + 0.5) / count - 0.5;
+          const px = alongX ? x + t * w * 0.9 : x;
+          const pz = alongX ? z : z + t * d * 0.9;
+          trims.push({
+            x: px, z: pz,
+            w: alongX ? 0.42 : w + 0.16,
+            d: alongX ? d + 0.16 : 0.42,
+            h: Math.min(h - 0.2, 6.4),
+          });
+        }
+      }
+      // dado band around the base (reads as a plinth on every wall)
+      if (h > 1.6 && short > 0.8) {
+        trims.push({ x, z, w: w + 0.1, d: d + 0.1, h: 0.42 });
+      }
+      // cornice just under the cap
+      if (h > 3.2) {
+        trims.push({ x, z, w: w + 0.14, d: d + 0.14, h: 0.22, y: h - 0.34 });
+      }
+    }
+
+    // three painted variants so neighbouring walls do not share one surface
+    const variantTex = [
+      wallPanel(`#${theme.wall.toString(16).padStart(6, '0')}`, `#${theme.wallDark.toString(16).padStart(6, '0')}`, 7),
+      wallPanel(`#${Math.max(0, (theme.wall >> 1) & 0x7f7f7f).toString(16).padStart(6, '0')}`, `#${theme.wallDark.toString(16).padStart(6, '0')}`, 23),
+      wallPanel(`#${theme.wallDark.toString(16).padStart(6, '0')}`, `#${theme.wall.toString(16).padStart(6, '0')}`, 41),
+    ];
+    const buckets = [[], [], []];
+    for (const wall of scaledWalls) {
+      const hsh = Math.abs((wall[0] * 17.3 + wall[1] * 5.9) | 0) % 3;
+      buckets[hsh].push({ x: wall[0], z: wall[1], w: wall[2], d: wall[3], h: wall[4] });
+    }
+    const trimGeo = mergedBoxGeometry(
+      trims.map((t) => ({ x: t.x, z: t.z, w: t.w, d: t.d, h: t.h, y: t.y || 0 })),
+      { tile: 2.2 },
     );
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.castShadow = this.quality !== 'low';
-    mesh.receiveShadow = true;
-    mesh.name = 'walls';
-    this.group.add(mesh);
-    this.wallMesh = mesh;
+
+    this.wallMeshes = [];
+    buckets.forEach((list, i) => {
+      if (!list.length) return;
+      const mat = surfaceMaterial(variantTex[i], {
+        key: `wall-${this.themeId}-${i}`,
+        roughness: 0.94,
+        metalness: 0.02,
+        normalScale: 1.15,
+      });
+      const geo = mergedBoxGeometry(list, { tile: 3.1, topShade: true });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = this.quality !== 'low';
+      mesh.receiveShadow = true;
+      mesh.name = 'walls';
+      this.group.add(mesh);
+      this.wallMeshes.push(mesh);
+    });
+    const trimMat = surfaceMaterial(variantTex[1], {
+      key: `trim-${this.themeId}`,
+      roughness: 0.9,
+      metalness: 0.03,
+      normalScale: 1.3,
+    });
+    /* --- windows & doorways: dark inset rectangles on tall faces ------ */
+    const openings = [];
+    for (const [x, z, w, d, h] of scaledWalls) {
+      if (h < 3.4) continue;
+      const long = Math.max(w, d);
+      if (long < 3.2) continue;
+      const alongX = w >= d;
+      const count = Math.min(5, Math.max(1, Math.round(long / 4.2)));
+      for (let i = 0; i < count; i++) {
+        const t = (i + 0.5) / count - 0.5;
+        const seed = (Math.abs((x * 31.1 + z * 17.7 + i * 7.3) | 0) % 100) / 100;
+        if (seed > 0.62) continue;
+        const isDoor = seed < 0.16;
+        const ow = isDoor ? 1.15 : 0.85 + seed * 0.35;
+        const oh = isDoor ? 2.05 : 0.95 + seed * 0.5;
+        const oy = isDoor ? 0.02 : 1.55 + seed * 0.9;
+        const px = alongX ? x + t * w * 0.82 : x;
+        const pz = alongX ? z : z + t * d * 0.82;
+        const depth = 0.14;
+        if (alongX) {
+          openings.push({ x: px, z: z + d / 2 + depth / 2, w: ow, d: depth, h: oh, y: oy });
+          openings.push({ x: px, z: z - d / 2 - depth / 2, w: ow, d: depth, h: oh, y: oy });
+        } else {
+          openings.push({ x: x + w / 2 + depth / 2, z: pz, w: depth, d: ow, h: oh, y: oy });
+          openings.push({ x: x - w / 2 - depth / 2, z: pz, w: depth, d: ow, h: oh, y: oy });
+        }
+      }
+    }
+    if (openings.length) {
+      const openGeo = mergedBoxGeometry(openings, { tile: 1.5, ao: false });
+      const openMat = new THREE.MeshStandardMaterial({
+        color: 0x0b0e11, roughness: 0.95, metalness: 0.0, vertexColors: true,
+      });
+      const openMesh = new THREE.Mesh(openGeo, openMat);
+      openMesh.name = 'wall-openings';
+      openMesh.receiveShadow = false;
+      this.group.add(openMesh);
+    }
+
+    const trimMesh = new THREE.Mesh(trimGeo, trimMat);
+    trimMesh.castShadow = this.quality !== 'low';
+    trimMesh.receiveShadow = true;
+    trimMesh.name = 'wall-trim';
+    this.group.add(trimMesh);
+    this.wallMesh = trimMesh;
 
     scaledWalls.forEach(([x, z, w, d, h, kind]) => {
       const box = new THREE.Box3(

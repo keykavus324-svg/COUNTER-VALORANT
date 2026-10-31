@@ -75,3 +75,16 @@ Tüm bu tablolar elle yazılmaz: `npm run gen` ile üretilir.
 | `npm run sim` | başsız maç simülasyonu (bot dengeleme) |
 
 Varlıkların kaynağı ve lisans/atıf bilgisi: [ASSETS.md](ASSETS.md).
+
+## Görsel doğrulama
+
+Sandbox'ta GPU yok, bu yüzden `tools/preview.mjs` gerçek `GameMap` sahnesini saf
+JavaScript ile rasterize edip PNG yazar (dokular/gölge yok; geometri, ölçek,
+silüet, ışık yönü ve renk dengesi var):
+
+```bash
+npm run preview -- de_dust2 out.png fov     # göz hizası
+npm run preview -- de_dust2 out.png top     # üstten
+PREVIEW_SUBJECT=weapon:ak47 npm run preview -- de_dust2 ak47.png
+PREVIEW_SUBJECT=actor:phoenix npm run preview -- de_dust2 ajan.png
+```

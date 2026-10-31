@@ -39,14 +39,22 @@ export function defaultSkin(weaponId) {
   return skinList(weaponId)[0] || null;
 }
 
-/** Resolve the skin a weapon should currently use. */
+/**
+ * Resolve the skin a weapon should currently use.
+ *
+ * Vanilla is the default: a gun only gets repainted when the player actually
+ * equipped a finish in the vault. Auto-applying the "flagship" skin to every
+ * weapon used to bleach the base materials (wood, blued steel, polymer) into
+ * one flat pale wash — which is exactly what made the viewmodel look plastic.
+ */
 export function resolveSkin(weaponId, skinMap) {
   const wanted = skinMap?.[weaponId];
-  if (wanted === 'none') return null;
-  if (wanted) {
-    const found = skinById(weaponId, wanted);
-    if (found) return found;
-  }
+  if (!wanted || wanted === 'none') return null;
+  return skinById(weaponId, wanted) || null;
+}
+
+/** Preview helper: the flagship finish, used by the skin vault thumbnails. */
+export function flagshipSkin(weaponId) {
   return defaultSkin(weaponId);
 }
 

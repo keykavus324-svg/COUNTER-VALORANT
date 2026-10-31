@@ -237,10 +237,11 @@ function curvedMag(w, d, h, mat, x, y, z, curve = 0.3, segs = 4) {
   const segH = h / segs;
   for (let i = 0; i < segs; i++) {
     const t = (i + 0.5) / segs;
-    const seg = new THREE.Mesh(new THREE.BoxGeometry(w, segH * 1.06, d), mat);
+    // overlap the segments so the sweep reads as one solid magazine
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(w, segH * 1.3, d * (1 - t * 0.12)), mat);
     const bend = curve * (t * t);
-    seg.position.set(0, -i * segH * 0.98, -bend * h * 0.55);
-    seg.rotation.x = bend * 0.9;
+    seg.position.set(0, -i * segH * 0.92, -bend * h * 0.5);
+    seg.rotation.x = bend * 0.55;
     group.add(seg);
   }
   group.position.set(x, y, z);

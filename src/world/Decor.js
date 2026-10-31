@@ -102,7 +102,7 @@ export function mergedBoxGeometry(boxes, { tile = 2.6, ao = true, topShade = fal
         if (ao) {
           if (ny === 0) {
             const t = Math.min(1, Math.max(0, (py - y0) / Math.max(0.001, h)));
-            aoV = 0.66 + Math.pow(t, 0.65) * 0.42;
+            aoV = 0.52 + Math.pow(t, 0.6) * 0.56;
           } else if (ny < 0) {
             aoV = 0.5;
           } else if (ny > 0) {

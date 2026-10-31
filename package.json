@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "preview": "node tools/preview.mjs",
     "check": "node tools/domcheck.mjs && node tools/assetcheck.mjs && node tools/mapcheck.mjs && node tools/skincheck.mjs && node tools/uicheck.mjs && node tools/scenecheck.mjs",
     "sim": "node tools/headless-sim.mjs",
     "test": "npm run check",

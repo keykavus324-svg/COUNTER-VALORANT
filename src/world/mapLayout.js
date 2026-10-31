@@ -47,28 +47,28 @@ export const MAP_BY_ID = Object.fromEntries(MAPS.map((m) => [m.id, m]));
 export const THEMES = {
   sand: {
     label: 'SAND', desc: 'Çöl tozu, kireç taşı duvarlar',
-    wall: 0xd8c49a, wallDark: 0xa8916a, floor: 0xcdb78d, ground: 0xc2a878, groundTint: 0xe0cba2,
-    crate: 0xb98b52, sky: [0x9dc4e8, 0xd8e6f2, 0xf0e2c4], sun: 0xfff0d2, hemi: [0xdfe8f5, 0xb59a6e],
+    wall: 0xd9bf8c, wallDark: 0x9c7f52, floor: 0x8d7a58, ground: 0x8a7550, groundTint: 0xc0a274,
+    crate: 0x9a6c38, sky: [0x3f7fc4, 0x8fbde4, 0xe9dcc0], sun: 0xfff0d2, hemi: [0xdfe8f5, 0x6b5638],
   },
   terracotta: {
     label: 'TERRACOTTA', desc: 'Kızıl kiremit, taş sokaklar',
-    wall: 0xb96a4a, wallDark: 0x8a4a33, floor: 0xb08968, ground: 0xa07a5c, groundTint: 0xc79d78,
-    crate: 0x8a5a36, sky: [0xe8b48a, 0xe6cfae, 0xf3e4c4], sun: 0xffd6a8, hemi: [0xf0dcc4, 0x7a5540],
+    wall: 0xc26a45, wallDark: 0x7c3d28, floor: 0x8a6a52, ground: 0x7d5c45, groundTint: 0xb08363,
+    crate: 0x8a5a36, sky: [0x4679b8, 0x9dc0d8, 0xf0d8b4], sun: 0xffd6a8, hemi: [0xf0dcc4, 0x5f4230],
   },
   industrial: {
     label: 'INDUSTRIAL', desc: 'Beton, çelik, soğuk ışık',
-    wall: 0x8a9098, wallDark: 0x5d646c, floor: 0x8e949a, ground: 0x6f757c, groundTint: 0xa6adb4,
-    crate: 0x6b6f56, sky: [0x8fa6bb, 0xb9c8d6, 0xdfe7ee], sun: 0xe8f0ff, hemi: [0xd6e2ee, 0x5a6068],
+    wall: 0x939ba3, wallDark: 0x50575e, floor: 0x6c7278, ground: 0x565c62, groundTint: 0x8b9298,
+    crate: 0x6b6f56, sky: [0x5b7690, 0x9fb4c6, 0xd8e2ea], sun: 0xe8f0ff, hemi: [0xd6e2ee, 0x42484e],
   },
   jungle: {
     label: 'JUNGLE', desc: 'Yosun, taş, nemli hava',
-    wall: 0x8d8f72, wallDark: 0x5f6349, floor: 0x7d8460, ground: 0x5d6b47, groundTint: 0x8f9c6b,
-    crate: 0x6b5533, sky: [0xa9c3b0, 0xd0dcc8, 0xe6eddc], sun: 0xe6f2cf, hemi: [0xd8e6d0, 0x4f5c3f],
+    wall: 0x8e906f, wallDark: 0x51573c, floor: 0x6d7550, ground: 0x4f5c3c, groundTint: 0x7d8a58,
+    crate: 0x6b5533, sky: [0x5d8a86, 0x9fbdb0, 0xdce6d2], sun: 0xe6f2cf, hemi: [0xd8e6d0, 0x3c452e],
   },
   sanctuary: {
     label: 'SANCTUARY', desc: 'Mermer, altın, kutsal ışık',
-    wall: 0xd9cfae, wallDark: 0xa89a72, floor: 0xcabf9c, ground: 0xb0a583, groundTint: 0xe4dcc0,
-    crate: 0x9a8a5f, sky: [0xf0d9a8, 0xe8cfae, 0xf6ecd2], sun: 0xfff2cc, hemi: [0xf2e8cf, 0x8a7c5e],
+    wall: 0xd6c9a1, wallDark: 0x8f7f55, floor: 0x94886a, ground: 0x8a7f60, groundTint: 0xc4b791,
+    crate: 0x9a8a5f, sky: [0x6f8fb8, 0xa9bfcf, 0xf0e2c0], sun: 0xfff2cc, hemi: [0xf2e8cf, 0x6a5f45],
   },
   concrete: {
     label: 'VERTIGO', desc: 'Yüksek beton, cam cephe',

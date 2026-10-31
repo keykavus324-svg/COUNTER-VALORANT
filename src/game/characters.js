@@ -20,8 +20,10 @@ const sharedGeo = {
   torso: scaled(capsule(0.225, 0.32, 6, 16), 1.0, 1.0, 0.66),
   chest: scaled(capsule(0.205, 0.24, 5, 14), 1.0, 1.0, 0.78),
   hips: scaled(capsule(0.2, 0.1, 4, 12), 1.0, 1.0, 0.74),
-  head: scaled(new THREE.SphereGeometry(0.125, 16, 12), 1.0, 1.08, 1.02),
-  helmet: new THREE.SphereGeometry(0.152, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.62),
+  head: scaled(new THREE.SphereGeometry(0.105, 16, 12), 0.94, 1.14, 1.0),
+  helmet: new THREE.SphereGeometry(0.126, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.52),
+  helmetRim: new THREE.TorusGeometry(0.118, 0.016, 6, 20),
+  mask: scaled(new THREE.SphereGeometry(0.1, 14, 10, 0, Math.PI * 2, Math.PI * 0.42, Math.PI * 0.34), 1.0, 1.0, 1.02),
   goggles: new THREE.TorusGeometry(0.088, 0.017, 6, 16),
   visor: new THREE.BoxGeometry(0.19, 0.055, 0.05),
   neck: new THREE.CylinderGeometry(0.058, 0.07, 0.1, 10),
@@ -148,28 +150,40 @@ export class Character {
     const teamStripe = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.24, 0.02), this.glowMat);
     teamStripe.position.set(0.12, 0.46, 0.19);
     const shoulderPadL = new THREE.Mesh(sharedGeo.pad, primaryMat);
-    shoulderPadL.position.set(-0.3, 0.6, 0);
-    shoulderPadL.rotation.z = 0.2;
+    shoulderPadL.position.set(-0.245, 0.585, 0.005);
+    shoulderPadL.rotation.z = 0.32;
+    shoulderPadL.scale.set(0.86, 0.5, 0.92);
     const shoulderPadR = shoulderPadL.clone();
-    shoulderPadR.position.x = 0.3;
-    shoulderPadR.rotation.z = -0.2;
+    shoulderPadR.position.x = 0.245;
+    shoulderPadR.rotation.z = -0.32;
     upper.add(hips, torso, chest, rig, pack, collar, teamStripe, shoulderPadL, shoulderPadR);
 
     // ---- head ----
     const headGroup = new THREE.Group();
-    headGroup.position.y = 0.92;
+    headGroup.position.y = 0.86;
     this.headGroup = headGroup;
     const neck = new THREE.Mesh(sharedGeo.neck, skin);
     neck.position.y = -0.03;
     const head = new THREE.Mesh(sharedGeo.head, skin);
     head.position.y = 0.12;
     const helmet = new THREE.Mesh(sharedGeo.helmet, primaryMat);
-    helmet.position.y = 0.16;
-    helmet.scale.set(1.16, 1.05, 1.18);
+    helmet.position.y = 0.145;
+    helmet.scale.set(1.08, 1.0, 1.1);
+    helmet.rotation.x = -0.12;
+    const rim = new THREE.Mesh(sharedGeo.helmetRim, this.darkMat);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.148;
+    rim.scale.set(1.02, 1.04, 1);
+    headGroup.add(rim);
+    // goggles sit on the helmet brim, not across the eyes
     const goggles = new THREE.Mesh(sharedGeo.goggles, this.darkMat);
-    goggles.position.set(0, 0.17, -0.01);
-    goggles.rotation.x = 1.32;
-    headGroup.add(goggles);
+    goggles.position.set(0, 0.205, 0.005);
+    goggles.rotation.x = 1.42;
+    goggles.scale.setScalar(0.92);
+    // lower-face mask: the read that says "operator" instead of "mannequin"
+    const mask = new THREE.Mesh(sharedGeo.mask, this.darkMat);
+    mask.position.set(0, 0.105, -0.005);
+    headGroup.add(goggles, mask);
     const visor = new THREE.Mesh(sharedGeo.visor, this.glowMat);
     visor.position.set(0, 0.13, 0.115);
     const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.09, 0.2), this.darkMat);
@@ -205,7 +219,7 @@ export class Character {
     // ---- arms ----
     const makeArm = (side) => {
       const arm = new THREE.Group();
-      arm.position.set(0.3 * side, 0.62, 0);
+      arm.position.set(0.255 * side, 0.6, 0.01);
       const upperArm = new THREE.Mesh(sharedGeo.upperArm, this.fabricMat);
       upperArm.position.y = -0.17;
       const elbow = new THREE.Group();
@@ -228,7 +242,8 @@ export class Character {
 
     // ---- weapon holder ----
     const weaponMount = new THREE.Group();
-    weaponMount.position.set(0.16, 0.5, -0.16);
+    weaponMount.position.set(0.05, 0.44, -0.3);
+    weaponMount.rotation.y = -0.12;
     weaponMount.rotation.set(0, 0, 0);
     this.weaponMount = weaponMount;
     upper.add(weaponMount);
@@ -313,11 +328,14 @@ export class Character {
       this.armR.rotation.set(-0.9, 0, -0.2);
       this.armL.rotation.set(-0.3, 0, 0.3);
     } else {
-      this.armR.rotation.set(-1.35, 0, -0.25);
-      this.armL.rotation.set(-1.5, 0.35, 0.42);
+      // right hand on the grip, left hand out on the handguard: the elbows do
+      // the work instead of the shoulders, which is what makes it read as a
+      // two-handed rifle carry rather than a T-pose with a prop in front
+      this.armR.rotation.set(-0.95, -0.45, -0.42);
+      this.armL.rotation.set(-1.15, 0.5, 0.62);
     }
-    this.elbowR.rotation.x = 0.75;
-    this.elbowL.rotation.x = 0.85;
+    this.elbowR.rotation.set(1.5, 0, 0.3);
+    this.elbowL.rotation.set(1.25, 0.1, -0.25);
   }
 
   /** world-space muzzle position */
@@ -367,8 +385,8 @@ export class Character {
       this.legL.rotation.x = -Math.sin(this.walkPhase) * 0.62 * swing;
     }
 
-    this.armR.rotation.x = -1.35 + Math.sin(this.walkPhase) * 0.06 * swing;
-    this.armL.rotation.x = -1.5 + Math.sin(this.walkPhase + 1) * 0.06 * swing;
+    this.armR.rotation.x = -0.95 + Math.sin(this.walkPhase) * 0.04 * swing;
+    this.armL.rotation.x = -1.15 + Math.sin(this.walkPhase + 1) * 0.035 * swing;
     // aim pitch
     this.upper.rotation.x = clamp(-this.pitch * 0.55, -0.55, 0.55);
 
