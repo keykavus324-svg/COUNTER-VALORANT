@@ -218,6 +218,48 @@ function cyl(rt, rb, h, mat, x = 0, y = 0, z = 0, rx = Math.PI / 2, seg = 12) {
   return m;
 }
 
+
+/** Trigger guard — every real firearm has one, and its absence reads as "toy". */
+function triggerGuard(mat, x = 0, y = -0.075, z = 0.005, r = 0.045) {
+  const m = new THREE.Mesh(new THREE.TorusGeometry(r, 0.0075, 5, 14, Math.PI * 1.15), mat);
+  m.position.set(x, y, z);
+  m.rotation.z = Math.PI * 0.06;
+  return m;
+}
+
+/**
+ * Curved magazine: four tapered segments swept along an arc. The AK banana mag
+ * is the single most recognisable silhouette in the game; a straight box
+ * instantly looks wrong.
+ */
+function curvedMag(w, d, h, mat, x, y, z, curve = 0.3, segs = 4) {
+  const group = new THREE.Group();
+  const segH = h / segs;
+  for (let i = 0; i < segs; i++) {
+    const t = (i + 0.5) / segs;
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(w, segH * 1.06, d), mat);
+    const bend = curve * (t * t);
+    seg.position.set(0, -i * segH * 0.98, -bend * h * 0.55);
+    seg.rotation.x = bend * 0.9;
+    group.add(seg);
+  }
+  group.position.set(x, y, z);
+  return group;
+}
+
+/** Short rail with visible slots, used on the flat-top guns. */
+function railSlots(mat, x, y, z, length, count = 5) {
+  const group = new THREE.Group();
+  const step = length / count;
+  for (let i = 0; i < count; i++) {
+    const slot = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.008, step * 0.55), mat);
+    slot.position.set(0, 0, -length / 2 + step * (i + 0.5));
+    group.add(slot);
+  }
+  group.position.set(x, y, z);
+  return group;
+}
+
 /**
  * Builds a weapon. Model faces -Z (muzzle direction), origin at the grip.
  * viewmodel=true uses slightly exaggerated proportions for the first person view.
@@ -252,7 +294,8 @@ export function buildWeaponModel(id, viewmodel = true, skinMap = null) {
       const sight = box(0.02, 0.025, 0.04, M.accent, 0, 0.1, -0.24);
       const trigger = box(0.03, 0.05, 0.02, M.metalDark, 0, -0.04, 0.02);
       magMesh = box(0.06, 0.09, 0.05, M.accentBlue, 0, -0.22, 0.09, 0.28);
-      g.add(slide, frame, grip, barrel, sight, trigger, magMesh);
+      const guard = triggerGuard(M.polymer, 0, -0.07, -0.02, 0.036);
+      g.add(slide, frame, grip, barrel, sight, trigger, magMesh, guard);
       muzzle.position.set(0, 0.05, -0.35);
       shellEject.position.set(0.05, 0.07, -0.06);
       break;
@@ -265,7 +308,8 @@ export function buildWeaponModel(id, viewmodel = true, skinMap = null) {
       const guard = box(0.055, 0.02, 0.1, M.metalDark, 0, -0.03, -0.02);
       magMesh = box(0.055, 0.12, 0.05, M.metalDark, 0, -0.22, 0.09, 0.28);
       const sight = box(0.02, 0.03, 0.03, M.steel, 0, 0.105, -0.3);
-      g.add(slide, supp, grip, accent, guard, magMesh, sight);
+      const triggerGuardMesh = triggerGuard(M.polymer, 0, -0.075, -0.01, 0.036);
+      g.add(slide, supp, grip, accent, guard, magMesh, sight, triggerGuardMesh);
       muzzle.position.set(0, 0.05, -0.52);
       shellEject.position.set(0.05, 0.08, -0.1);
       break;
@@ -335,11 +379,15 @@ export function buildWeaponModel(id, viewmodel = true, skinMap = null) {
       const handguard = box(0.07, 0.08, 0.26, M.wood, 0, 0.0, -0.28);
       const stock = box(0.055, 0.13, 0.32, M.wood, 0, -0.03, 0.25, 0.03);
       const grip = box(0.06, 0.18, 0.09, M.woodDark, 0, -0.14, 0.04, 0.22);
-      magMesh = box(0.07, 0.24, 0.1, M.metalDark, 0, -0.15, -0.14, -0.18);
+      magMesh = curvedMag(0.07, 0.1, 0.26, M.metalDark, 0, -0.14, -0.14, 0.9, 5);
       const rail = box(0.05, 0.03, 0.2, M.metal, 0, 0.075, -0.12);
+      const slots = railSlots(M.metalDark, 0, 0.086, -0.12, 0.18, 4);
       const sight = box(0.035, 0.05, 0.05, M.metalDark, 0, 0.11, -0.1);
       const accent = box(0.085, 0.025, 0.1, M.accent, 0, 0.02, 0.1);
-      g.add(body, barrel, gasBlock, handguard, stock, grip, magMesh, rail, sight, accent);
+      const guard = triggerGuard(M.metal, 0, -0.085, 0.02, 0.05);
+      const gasTube = cyl(0.012, 0.012, 0.26, M.metal, 0, 0.078, -0.42);
+      const bolt = box(0.03, 0.03, 0.02, M.metal, 0.05, 0.03, -0.02);
+      g.add(body, barrel, gasBlock, handguard, stock, grip, magMesh, rail, slots, sight, accent, guard, gasTube, bolt);
       muzzle.position.set(0, 0.04, -0.7);
       shellEject.position.set(0.055, 0.06, -0.02);
       break;
@@ -350,11 +398,15 @@ export function buildWeaponModel(id, viewmodel = true, skinMap = null) {
       const handguard = box(0.075, 0.085, 0.3, M.polymer, 0, 0.015, -0.3);
       const stock = box(0.055, 0.12, 0.34, M.polymer, 0, -0.02, 0.26);
       const grip = box(0.06, 0.18, 0.09, M.polymer, 0, -0.14, 0.05, 0.2);
-      magMesh = box(0.06, 0.22, 0.09, M.metalDark, 0, -0.14, -0.13, -0.1);
+      magMesh = curvedMag(0.06, 0.09, 0.23, M.metalDark, 0, -0.13, -0.13, 0.32, 4);
       const rail = box(0.05, 0.035, 0.34, M.metal, 0, 0.08, -0.14);
+      const slots = railSlots(M.metalDark, 0, 0.1, -0.14, 0.3, 6);
       const sight = box(0.04, 0.055, 0.09, M.metalDark, 0, 0.12, -0.08);
       const accent = box(0.085, 0.025, 0.12, M.accentBlue, 0, 0.02, 0.08);
-      g.add(body, supp, handguard, stock, grip, magMesh, rail, sight, accent);
+      const guard = triggerGuard(M.metal, 0, -0.085, 0.02, 0.05);
+      const charge = box(0.05, 0.02, 0.06, M.metal, 0, 0.055, 0.16);
+      const fwdAssist = cyl(0.012, 0.012, 0.06, M.metalDark, 0.045, 0.055, -0.02);
+      g.add(body, supp, handguard, stock, grip, magMesh, rail, slots, sight, accent, guard, charge, fwdAssist);
       muzzle.position.set(0, 0.045, -0.68);
       shellEject.position.set(0.055, 0.06, -0.02);
       break;
@@ -371,10 +423,21 @@ export function buildWeaponModel(id, viewmodel = true, skinMap = null) {
       const cheek = box(0.055, 0.06, 0.2, M.polymer, 0, 0.06, 0.24);
       const grip = box(0.06, 0.19, 0.1, M.polymer, 0, -0.14, 0.06, 0.22);
       magMesh = box(0.065, 0.18, 0.11, M.metalDark, 0, -0.12, -0.12);
+      const turretTop = cyl(0.026, 0.026, 0.03, M.metal, 0, 0.196, -0.08, 0, 12);
+      const turretSide = cyl(0.024, 0.024, 0.03, M.metal, 0.05, 0.155, -0.08, 0, 12);
+      turretSide.rotation.z = Math.PI / 2;
+      turretSide.rotation.x = 0;
+      const boltHandle = cyl(0.011, 0.011, 0.09, M.metal, 0.06, 0.04, 0.02, 0, 8);
+      boltHandle.rotation.z = 0.9;
+      boltHandle.rotation.x = 0;
+      const boltKnob = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), M.metalDark);
+      boltKnob.position.set(0.095, 0.075, 0.02);
+      const guard = triggerGuard(M.metal, 0, -0.075, 0.03, 0.05);
       const bipodL = box(0.02, 0.22, 0.02, M.metal, -0.08, -0.16, -0.72, 0, 0, 0.3);
       const bipodR = box(0.02, 0.22, 0.02, M.metal, 0.08, -0.16, -0.72, 0, 0, -0.3);
       const accent = box(0.09, 0.025, 0.14, M.accent, 0, 0.02, 0.14);
-      g.add(body, barrel, muzzleBrake, scopeBody, lens, lens2, scopeMount, stock, cheek, grip, magMesh, bipodL, bipodR, accent);
+      g.add(body, barrel, muzzleBrake, scopeBody, lens, lens2, scopeMount, stock, cheek, grip, magMesh,
+        turretTop, turretSide, boltHandle, boltKnob, guard, bipodL, bipodR, accent);
       muzzle.position.set(0, 0.045, -1.0);
       shellEject.position.set(0.055, 0.06, 0.0);
       break;

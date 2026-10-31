@@ -33,20 +33,24 @@ for (const id of Object.keys(WEAPON_SKINS)) {
   const baseColours = new Set();
   base.traverse((o) => { if (o.isMesh && o.material?.color) baseColours.add(o.material.color.getHexString()); });
 
-  // decal geometry must end up outside the receiver, not buried in it
+  // Measure the bare hull BEFORE the artwork exists, then require the decal to
+  // sit outside it. (Measuring afterwards would include the decal itself and
+  // the assertion would be circular.)
+  const s0 = skinned.scale.clone();
+  skinned.scale.setScalar(1);
+  skinned.updateMatrixWorld(true);
+  const hull = new THREE.Box3().setFromObject(skinned);
+  skinned.scale.copy(s0);
+  const hullHalf = hull.getSize(new THREE.Vector3()).x / 2;
+
   const ok = applySkinDecal(skinned, { id: 'x', name: 'AK-47 | Redline' }, { texture: fakeTex });
   let decalOk = ok;
   if (ok) {
     const art = skinned.userData.cvSkinDecal[0];
-    // measure the hull without the viewmodel scaling
-    const s0 = skinned.scale.clone();
-    skinned.scale.setScalar(1);
-    skinned.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(skinned);
-    skinned.scale.copy(s0);
-    const half = box.getSize(new THREE.Vector3()).x / 2;
     const flank = art.children[0];
-    decalOk = ok && flank.position.x >= half * 0.99;
+    // just proud of the hull, but not floating a hand away from it
+    decalOk = ok && Math.abs(flank.position.x) >= hullHalf * 0.98
+      && Math.abs(flank.position.x) <= hullHalf * 1.25 + 0.02;
   }
   const changed = maps.length > 0
     || colours.size !== baseColours.size

@@ -8,23 +8,35 @@ import { clamp, damp } from '../core/utils.js';
  * walk / aim / death animation. Used for bots and for the player's avatar.
  */
 
+/**
+ * Shared geometry. Everything organic is a capsule or a sphere instead of a
+ * box: boxes are what made the operators read as Lego figures. Only hard gear
+ * (mag pouches, boots, weapon) stays boxy, which is correct for those parts.
+ */
+const capsule = (r, len, cap = 5, rad = 12) => new THREE.CapsuleGeometry(r, len, cap, rad);
+const scaled = (geo, x, y, z) => { geo.scale(x, y, z); return geo; };
+
 const sharedGeo = {
-  torso: new THREE.BoxGeometry(0.5, 0.62, 0.3),
-  chest: new THREE.BoxGeometry(0.44, 0.34, 0.33),
-  hips: new THREE.BoxGeometry(0.42, 0.24, 0.28),
-  head: new THREE.BoxGeometry(0.24, 0.26, 0.24),
-  helmet: new THREE.SphereGeometry(0.16, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62),
-  visor: new THREE.BoxGeometry(0.24, 0.075, 0.06),
-  neck: new THREE.CylinderGeometry(0.07, 0.08, 0.1, 8),
-  upperArm: new THREE.BoxGeometry(0.13, 0.34, 0.14),
-  lowerArm: new THREE.BoxGeometry(0.115, 0.32, 0.12),
-  hand: new THREE.BoxGeometry(0.1, 0.11, 0.1),
-  thigh: new THREE.BoxGeometry(0.17, 0.44, 0.19),
-  shin: new THREE.BoxGeometry(0.145, 0.42, 0.165),
-  boot: new THREE.BoxGeometry(0.16, 0.12, 0.28),
-  rig: new THREE.BoxGeometry(0.46, 0.3, 0.35),
-  pad: new THREE.BoxGeometry(0.18, 0.12, 0.2),
-  pack: new THREE.BoxGeometry(0.32, 0.34, 0.18),
+  torso: scaled(capsule(0.225, 0.32, 6, 16), 1.0, 1.0, 0.66),
+  chest: scaled(capsule(0.205, 0.24, 5, 14), 1.0, 1.0, 0.78),
+  hips: scaled(capsule(0.2, 0.1, 4, 12), 1.0, 1.0, 0.74),
+  head: scaled(new THREE.SphereGeometry(0.125, 16, 12), 1.0, 1.08, 1.02),
+  helmet: new THREE.SphereGeometry(0.152, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.62),
+  goggles: new THREE.TorusGeometry(0.088, 0.017, 6, 16),
+  visor: new THREE.BoxGeometry(0.19, 0.055, 0.05),
+  neck: new THREE.CylinderGeometry(0.058, 0.07, 0.1, 10),
+  upperArm: capsule(0.058, 0.22, 4, 10),
+  lowerArm: capsule(0.05, 0.2, 4, 10),
+  hand: new THREE.BoxGeometry(0.085, 0.1, 0.095),
+  thigh: capsule(0.082, 0.3, 4, 10),
+  shin: capsule(0.068, 0.28, 4, 10),
+  boot: new THREE.BoxGeometry(0.155, 0.115, 0.27),
+  kneePad: new THREE.SphereGeometry(0.072, 10, 8),
+  rig: scaled(new THREE.BoxGeometry(0.44, 0.28, 0.3), 1, 1, 1),
+  pouch: new THREE.BoxGeometry(0.1, 0.12, 0.07),
+  pad: scaled(new THREE.SphereGeometry(0.105, 12, 8), 1.15, 0.72, 1.0),
+  pack: new THREE.BoxGeometry(0.3, 0.32, 0.16),
+  strap: new THREE.BoxGeometry(0.055, 0.34, 0.02),
 };
 
 function mat(color, opts = {}) {
@@ -92,7 +104,10 @@ export class Character {
     shinR.position.y = -0.62;
     const bootR = new THREE.Mesh(sharedGeo.boot, gearMat);
     bootR.position.set(0, -0.84, 0.05);
-    legR.add(thighR, shinR, bootR);
+    const kneeR = new THREE.Mesh(sharedGeo.kneePad, gearMat);
+    kneeR.position.set(0, -0.46, 0.05);
+    kneeR.scale.set(1, 0.9, 0.75);
+    legR.add(thighR, shinR, bootR, kneeR);
     const legL = legR.clone();
     legL.position.x = -0.115;
     root.add(legR, legL);
@@ -114,6 +129,20 @@ export class Character {
     rig.scale.set(1.02, 0.9, 0.9);
     const pack = new THREE.Mesh(sharedGeo.pack, this.darkMat);
     pack.position.set(0, 0.42, -0.23);
+    // magazine pouches across the chest rig
+    for (let i = 0; i < 3; i++) {
+      const pouch = new THREE.Mesh(sharedGeo.pouch, gearMat);
+      pouch.position.set(-0.13 + i * 0.13, 0.18, 0.15);
+      pouch.rotation.x = -0.06;
+      upper.add(pouch);
+    }
+    // sling straps over the shoulders
+    for (const sx of [-1, 1]) {
+      const strap = new THREE.Mesh(sharedGeo.strap, this.darkMat);
+      strap.position.set(sx * 0.16, 0.42, 0.14);
+      strap.rotation.set(0.12, 0, sx * 0.16);
+      upper.add(strap);
+    }
     const collar = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.1, 0.26), primaryMat);
     collar.position.y = 0.68;
     const teamStripe = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.24, 0.02), this.glowMat);
@@ -137,6 +166,10 @@ export class Character {
     const helmet = new THREE.Mesh(sharedGeo.helmet, primaryMat);
     helmet.position.y = 0.16;
     helmet.scale.set(1.16, 1.05, 1.18);
+    const goggles = new THREE.Mesh(sharedGeo.goggles, this.darkMat);
+    goggles.position.set(0, 0.17, -0.01);
+    goggles.rotation.x = 1.32;
+    headGroup.add(goggles);
     const visor = new THREE.Mesh(sharedGeo.visor, this.glowMat);
     visor.position.set(0, 0.13, 0.115);
     const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.09, 0.2), this.darkMat);

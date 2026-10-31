@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { buildWeaponModel, getWeapon } from './weapons.js';
 import { AGENTS } from './agents.js';
-import { glowTexture, studioEnvTexture } from '../world/Textures.js';
+import { glowTexture, studioEnvTexture, fabric, normalMapFrom } from '../world/Textures.js';
 import { clamp, damp } from '../core/utils.js';
 
 /**
@@ -76,38 +76,115 @@ export class Viewmodel {
     this.setAgent('phoenix');
   }
 
+  /**
+   * First-person hands. The old version was three boxes per arm, which is the
+   * first thing the eye rejects in an FPS. This one is built from capsules
+   * (upper arm, forearm), a rolled cuff, a glove with individual fingers and a
+   * thumb, a knuckle plate and a wrist watch — still cheap, but it reads as a
+   * human arm at arm's length.
+   */
   _buildArms() {
     const g = new THREE.Group();
-    const sleeveMat = new THREE.MeshStandardMaterial({ color: 0x39424a, roughness: 0.9 });
-    const gloveMat = new THREE.MeshStandardMaterial({ color: 0x1d2329, roughness: 0.8 });
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0xc9926f, roughness: 0.85 });
+    const sleeveTex = fabric('#39434c', 5);
+    const gloveTex = fabric('#1b2024', 9);
+    const sleeveMat = new THREE.MeshStandardMaterial({
+      map: sleeveTex || null,
+      normalMap: sleeveTex ? normalMapFrom(sleeveTex.image, 0.9) : null,
+      color: sleeveTex ? 0xffffff : 0x39424a,
+      roughness: 0.95,
+      metalness: 0.0,
+    });
+    const cuffMat = new THREE.MeshStandardMaterial({ color: 0x232a30, roughness: 0.85 });
+    const gloveMat = new THREE.MeshStandardMaterial({
+      map: gloveTex || null,
+      normalMap: gloveTex ? normalMapFrom(gloveTex.image, 1.4) : null,
+      color: gloveTex ? 0xffffff : 0x1d2329,
+      roughness: 0.72,
+      metalness: 0.04,
+    });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xc08a63, roughness: 0.78, metalness: 0.0 });
+    const plateMat = new THREE.MeshStandardMaterial({ color: 0x2c343b, roughness: 0.5, metalness: 0.55 });
     this.armMats = { sleeveMat, gloveMat, skinMat };
 
-    // right arm (trigger hand) — from bottom right toward grip
-    const rArm = new THREE.Group();
-    const rSleeve = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.13, 0.55), sleeveMat);
-    rSleeve.position.set(0.04, -0.02, 0.12);
-    rSleeve.rotation.set(0.28, -0.18, 0);
-    const rFore = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.3, 8), skinMat);
-    rFore.rotation.x = Math.PI / 2.1;
-    rFore.position.set(0.0, -0.02, -0.2);
-    const rGlove = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.11, 0.16), gloveMat);
-    rGlove.position.set(0.0, -0.01, -0.35);
-    rArm.add(rSleeve, rFore, rGlove);
+    const makeArm = (side) => {
+      // side: +1 right (trigger hand), -1 left (support hand)
+      const arm = new THREE.Group();
+
+      // upper arm: capsule running back along +Z from the elbow
+      const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.062, 0.26, 4, 10), sleeveMat);
+      upper.rotation.x = Math.PI / 2;
+      upper.position.set(0, -0.008, 0.34);
+      upper.castShadow = false;
+      arm.add(upper);
+
+      // elbow pad
+      const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.066, 10, 8), cuffMat);
+      elbow.position.set(0, -0.004, 0.2);
+      elbow.scale.set(1, 1, 1.15);
+      arm.add(elbow);
+
+      // forearm: bare skin, slightly tapered
+      const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.055, 0.26, 10), skinMat);
+      fore.rotation.x = Math.PI / 2;
+      fore.position.set(0, 0, 0.07);
+      arm.add(fore);
+
+      // rolled-up sleeve end just past the elbow
+      const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.016, 6, 14), cuffMat);
+      cuff.position.set(0, 0, 0.17);
+      arm.add(cuff);
+
+      // wrist wrap
+      const wrap = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.05, 0.05, 10), gloveMat);
+      wrap.rotation.x = Math.PI / 2;
+      wrap.position.set(0, 0, -0.055);
+      arm.add(wrap);
+      if (side < 0) {
+        const watch = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.028, 12), plateMat);
+        watch.rotation.x = Math.PI / 2;
+        watch.position.set(0, 0, -0.03);
+        const face = new THREE.Mesh(
+          new THREE.CircleGeometry(0.032, 12),
+          new THREE.MeshStandardMaterial({ color: 0x0d1216, emissive: 0x2a6f7a, emissiveIntensity: 0.8, roughness: 0.3 }),
+        );
+        face.position.set(0, 0.052, -0.03);
+        face.rotation.x = -Math.PI / 2;
+        arm.add(watch, face);
+      }
+
+      // glove: palm, knuckle plate, fingers, thumb
+      const hand = new THREE.Group();
+      hand.position.set(0, -0.004, -0.13);
+      const palm = new THREE.Mesh(new THREE.BoxGeometry(0.078, 0.088, 0.1), gloveMat);
+      palm.position.set(0, 0, 0);
+      hand.add(palm);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.072, 0.03, 0.06), plateMat);
+      plate.position.set(0, 0.042, 0.01);
+      hand.add(plate);
+      // four fingers curling around the grip
+      for (let i = 0; i < 4; i++) {
+        const finger = new THREE.Mesh(new THREE.CapsuleGeometry(0.0125, 0.062, 3, 6), gloveMat);
+        finger.rotation.x = Math.PI / 2.05;
+        finger.rotation.z = 0.1 * side;
+        finger.position.set(-0.028 + i * 0.019, 0.012 - i * 0.004, -0.062);
+        hand.add(finger);
+      }
+      // thumb wraps the other side
+      const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.015, 0.05, 3, 6), gloveMat);
+      thumb.rotation.set(0.5, 0, 0.9 * side);
+      thumb.position.set(0.042 * side, 0.005, -0.03);
+      hand.add(thumb);
+
+      arm.add(hand);
+      arm.userData.hand = hand;
+      return arm;
+    };
+
+    const rArm = makeArm(1);
     rArm.position.set(0.25, -0.3, -0.25);
     rArm.rotation.set(0.18, -0.2, 0.1);
 
-    // left arm (support hand) reaches further forward
-    const lArm = new THREE.Group();
-    const lSleeve = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.6), sleeveMat);
-    lSleeve.position.set(-0.02, 0, 0.2);
-    lSleeve.rotation.set(0.45, 0.25, 0);
-    const lFore = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.26, 8), skinMat);
-    lFore.rotation.x = Math.PI / 2.3;
-    lFore.position.set(-0.04, -0.02, -0.16);
-    const lGlove = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.15), gloveMat);
-    lGlove.position.set(-0.05, -0.02, -0.3);
-    lArm.add(lSleeve, lFore, lGlove);
+    const lArm = makeArm(-1);
     lArm.position.set(-0.16, -0.32, -0.3);
     lArm.rotation.set(0.1, 0.32, -0.12);
 
