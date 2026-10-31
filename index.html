@@ -127,6 +127,25 @@
     </div>
   </div>
 
+
+  <!-- ============================ CAREER ============================ -->
+  <div id="career-panel" class="overlay hidden">
+    <div class="modal wide-m">
+      <header class="modal-head">
+        <div>
+          <div class="eyebrow">KALICI PROFİL</div>
+          <h2>KARİYER İSTATİSTİKLERİ</h2>
+        </div>
+        <button class="x-btn" id="career-close">✕</button>
+      </header>
+      <div id="career-body" class="career-body"></div>
+      <div class="modal-actions">
+        <button class="btn danger slim" id="career-reset">PROFİLİ SIFIRLA</button>
+        <button class="btn primary" id="career-ok">KAPAT</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ============================ PAUSE ============================ -->
   <div id="pause-menu" class="overlay hidden">
     <div class="modal narrow-m">
@@ -177,7 +196,15 @@
           <label class="range-row">Uzunluk <output id="out-ch-len">7</output>
             <input type="range" id="set-ch-len" min="2" max="18" step="1" value="7" />
           </label>
+          <label class="range-row">Kalınlık <output id="out-ch-thick">2</output>
+            <input type="range" id="set-ch-thick" min="1" max="6" step="1" value="2" />
+          </label>
           <label class="check-row"><input type="checkbox" id="set-ch-dot" checked /> Nokta göster</label>
+          <label class="check-row"><input type="checkbox" id="set-ch-outline" checked /> Siyah dış çizgi</label>
+          <label class="check-row"><input type="checkbox" id="set-ch-dynamic" checked /> Hareket ederken açıl (dinamik)</label>
+          <div class="ch-preview" id="ch-preview" aria-hidden="true">
+            <div class="pv t"></div><div class="pv b"></div><div class="pv l"></div><div class="pv r"></div><div class="pv d"></div>
+          </div>
         </div>
       </div>
       <div class="modal-actions">
@@ -215,6 +242,7 @@
       <div class="menu-actions secondary">
         <button class="btn slim" id="btn-skins"><span>SKIN KOLEKSİYONU</span><small>orijinal silah kaplamaları</small></button>
         <button class="btn slim" id="btn-maps"><span>HARİTALAR</span><small>CS2 harita galerisi</small></button>
+        <button class="btn slim" id="btn-career"><span>KARİYER</span><small>istatistikler &amp; maç geçmişi</small></button>
       </div>
       <div class="menu-stats">
         <div><b id="stat-agents">4</b><span>OPERATÖR</span></div>
@@ -268,6 +296,7 @@
       <h1 id="me-title">ZAFER</h1>
       <div class="me-score" id="me-score">5 — 3</div>
       <div class="me-stats" id="me-stats"></div>
+        <div class="me-career" id="me-career"></div>
       <div class="me-actions">
         <button class="btn primary" id="btn-rematch">TEKRAR OYNA</button>
         <button class="btn ghost" id="btn-exit">ANA MENÜ</button>

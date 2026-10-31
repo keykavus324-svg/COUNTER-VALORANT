@@ -8,6 +8,8 @@ import { WALLS, PROPS, SITES, SPAWNS, MAP_BOUNDS } from '../world/mapLayout.js';
 import { WeaponPreview } from './weaponPreview.js';
 import { skinThumbnail } from './skinThumb.js';
 import { audio } from '../core/audio.js';
+import { profileSummary, loadProfile, resetProfile } from '../game/profile.js';
+import { WEAPONS as CS_WEAPONS } from '../game/weapons.js';
 import { clamp, fmtTime, distance2D } from '../core/utils.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -22,6 +24,9 @@ const DEFAULT_SETTINGS = {
   chColor: '#5dff9a',
   chDotColor: '#ffffff',
   chGap: 6,
+  chThick: 2,
+  chOutline: true,
+  chDynamic: true,
   chLen: 7,
   chDot: true,
   agentId: 'phoenix',
@@ -84,6 +89,7 @@ export class UI {
       damageVignette: $('#damage-vignette'), flashOverlay: $('#flash-overlay'),
       buyWeapons: $('#buy-weapons'), buyGear: $('#buy-gear'), buyCredits: $('#buy-credits'),
       buySummary: $('#buy-summary'),
+      careerPanel: $('#career-panel'), careerBody: $('#career-body'), meCareer: $('#me-career'),
       sbAllies: $('#sb-allies'), sbEnemies: $('#sb-enemies'), sbScore: $('#sb-score'),
       agentGrid: $('#agent-grid'), adName: $('#ad-name'), adRole: $('#ad-role'), adDesc: $('#ad-desc'),
       adAbilities: $('#ad-abilities'), adArt: $('#ad-art'), adDmg: $('#ad-stat-dmg'),
@@ -97,7 +103,8 @@ export class UI {
       svCanvas: $('#sv-canvas'), svStageSkin: $('#sv-stage-skin'), svStageWeapon: $('#sv-stage-weapon'),
       svHint: $('#sv-hint'), vaultStatus: $('#vault-status'),
       mapsGallery: $('#maps-gallery'), mapsGrid: $('#maps-grid'),
-      btnSkins: $('#btn-skins'), btnMaps: $('#btn-maps'), btnVaultBack: $('#btn-vault-back'),
+      btnSkins: $('#btn-skins'), btnMaps: $('#btn-maps'), btnCareer: $('#btn-career'),
+      btnVaultBack: $('#btn-vault-back'),
       btnVaultNone: $('#btn-vault-none'), btnMapsClose: $('#btn-maps-close'),
     };
     this.mm = this.el.minimap?.getContext('2d');
@@ -294,7 +301,10 @@ export class UI {
     set('#set-dot-color', s.chDotColor);
     set('#set-ch-gap', s.chGap); out('#out-ch-gap', s.chGap);
     set('#set-ch-len', s.chLen); out('#out-ch-len', s.chLen);
+    set('#set-ch-thick', s.chThick || 2); out('#out-ch-thick', s.chThick || 2);
     $('#set-ch-dot').checked = s.chDot;
+    $('#set-ch-outline').checked = s.chOutline !== false;
+    $('#set-ch-dynamic').checked = s.chDynamic !== false;
 
     $('#set-sens').addEventListener('input', (e) => {
       s.sens = parseFloat(e.target.value);
@@ -336,6 +346,17 @@ export class UI {
     $('#set-ch-dot').addEventListener('change', (e) => {
       s.chDot = e.target.checked; this._initCrosshair(); this.save();
     });
+    $('#set-ch-thick').addEventListener('input', (e) => {
+      s.chThick = parseInt(e.target.value, 10); out('#out-ch-thick', s.chThick); this._initCrosshair(); this.save();
+    });
+    $('#set-ch-outline').addEventListener('change', (e) => {
+      s.chOutline = e.target.checked; this._initCrosshair(); this.save();
+    });
+    $('#set-ch-dynamic').addEventListener('change', (e) => {
+      s.chDynamic = e.target.checked;
+      if (!s.chDynamic) document.documentElement.style.setProperty('--ch-gap', `${s.chGap}px`);
+      this.save();
+    });
 
     this.load();
     // sync UI from loaded values
@@ -349,6 +370,10 @@ export class UI {
     set('#set-ch-gap', this.settings.chGap); out('#out-ch-gap', this.settings.chGap);
     set('#set-ch-len', this.settings.chLen); out('#out-ch-len', this.settings.chLen);
     $('#set-ch-dot').checked = this.settings.chDot;
+    set('#set-ch-thick', this.settings.chThick || 2); out('#out-ch-thick', this.settings.chThick || 2);
+    $('#set-ch-outline').checked = this.settings.chOutline !== false;
+    $('#set-ch-dynamic').checked = this.settings.chDynamic !== false;
+    this._initCrosshair();
     this.selectedAgent = this.settings.agentId || 'phoenix';
   }
 
@@ -385,7 +410,33 @@ export class UI {
     root.setProperty('--ch-dot', s.chDotColor);
     root.setProperty('--ch-gap', `${s.chGap}px`);
     root.setProperty('--ch-len', `${s.chLen}px`);
-    if (this.el.crosshair) this.el.crosshair.classList.toggle('no-dot', !s.chDot);
+    root.setProperty('--ch-thick', `${s.chThick || 2}px`);
+    root.setProperty('--ch-dot-size', `${s.chDotSize || 2}px`);
+    const pv = $('#ch-preview');
+    if (this.el.crosshair) {
+      this.el.crosshair.classList.toggle('no-dot', !s.chDot);
+      this.el.crosshair.classList.toggle('outline', !!s.chOutline);
+    }
+    if (pv) {
+      pv.classList.toggle('no-dot', !s.chDot);
+      pv.classList.toggle('outline', !!s.chOutline);
+    }
+    this._baseGap = s.chGap;
+  }
+
+  /**
+   * CS style dynamic crosshair: the gap opens while moving, firing or airborne
+   * so the player can read their own inaccuracy without a debug overlay.
+   */
+  updateCrosshairDynamics(player) {
+    if (!this.settings.chDynamic || !this.el.crosshair) return;
+    const speed = Math.hypot(player.vel.x, player.vel.z);
+    const shots = Math.min(6, player.shotIndex || 0);
+    const air = player.grounded ? 0 : 2.5;
+    const target = (this._baseGap || 6) + speed * 1.35 + shots * 1.1 + air;
+    this._chGapShown = this._chGapShown ?? (this._baseGap || 6);
+    this._chGapShown += (target - this._chGapShown) * 0.25;
+    document.documentElement.style.setProperty('--ch-gap', `${this._chGapShown.toFixed(1)}px`);
   }
 
   /* ================================================================ */
@@ -995,8 +1046,14 @@ export class UI {
     });
     gear.push({
       id: 'helmet', name: 'KEVLAR + KASK', desc: data.helmet ? 'Kask takılı — kafa vuruşu yarıya iner' : 'Kask yok — kafadan tek mermi ölüm',
-      price: 1000, owned: !!data.helmet, icon: '⛑',
+      price: (data.armor || 0) > 0 ? 350 : 1000, owned: !!data.helmet, icon: '⛑',
     });
+    if (data.canBuyKit) {
+      gear.push({
+        id: 'kit', name: 'DEFUSE KIT', desc: data.kit ? 'Bomba çözme 5 saniye' : 'Bomba çözme 10 → 5 saniye',
+        price: 400, owned: !!data.kit, icon: '🔧',
+      });
+    }
     for (const g of data.grenades || []) {
       const st = g.state || { charges: 0, maxCharges: g.charges || 1 };
       const max = st.maxCharges ?? g.charges ?? 1;
@@ -1022,6 +1079,7 @@ export class UI {
       btn.addEventListener('click', () => {
         const id = btn.dataset.gear;
         if (id === 'kevlar' || id === 'helmet') this.game?.buyArmor(id);
+        else if (id === 'kit') this.game?.buyKit?.();
         else if (id.startsWith('ab:')) this.game?.buyAbility(id.slice(3));
       });
     });
@@ -1079,6 +1137,17 @@ export class UI {
       <div><b>${Math.round(p.damageDealt)}</b><span>HASAR</span></div>
       <div><b>${p.kills}/${Math.max(1, p.deaths)}</b><span>K/D</span></div>
     `;
+    if (data.career && this.el.meCareer) {
+      const c = data.career;
+      this.el.meCareer.innerHTML = `
+        <span>KARİYER</span>
+        <b>${c.matches}</b> maç
+        <b>${c.winRate.toFixed(0)}%</b> kazanma
+        <b>${c.kd.toFixed(2)}</b> K/D
+        <b>${c.hsPercent.toFixed(0)}%</b> HS
+        <b>${c.rating.toFixed(2)}</b> rating
+        <b>+${p.kills}</b> kill bu maç`;
+    }
     this.showHUD(false);
     document.body.classList.remove('playing');
     audio.play(data.win ? 'win' : 'lose', { volume: 1 });
@@ -1093,6 +1162,14 @@ export class UI {
     // buttons
     this.el.btnSkins?.addEventListener('click', () => { audio.play('ui_click'); this.showSkinVault(true); });
     this.el.btnMaps?.addEventListener('click', () => { audio.play('ui_click'); this.showMapsGallery(true); });
+    this.el.btnCareer?.addEventListener('click', () => this.showCareer(true));
+    $('#career-close')?.addEventListener('click', () => this.showCareer(false));
+    $('#career-ok')?.addEventListener('click', () => this.showCareer(false));
+    $('#career-reset')?.addEventListener('click', () => {
+      resetProfile();
+      this.renderCareer(profileSummary(loadProfile()));
+      this.toast('Kariyer profili sıfırlandı', 2.2);
+    });
     this.el.btnVaultBack?.addEventListener('click', () => { audio.play('ui_click'); this.showSkinVault(false); });
     this.el.btnMapsClose?.addEventListener('click', () => { audio.play('ui_click'); this.showMapsGallery(false); });
     this.el.btnVaultNone?.addEventListener('click', () => {
@@ -1148,6 +1225,67 @@ export class UI {
     // swapped by renderBuy() at runtime, kept here so the buy menu can use it
     this._weaponArt = {};
     for (const id of Object.keys(WEAPON_SKINS)) this._weaponArt[id] = this.weaponArtURL(id);
+  }
+
+  /* ---------------- career / stats ---------------- */
+  showCareer(open) {
+    this.el.careerPanel?.classList.toggle('hidden', !open);
+    if (open) {
+      this.renderCareer(profileSummary(loadProfile()));
+      audio.play('ui_click');
+    }
+  }
+
+  renderCareer(sum) {
+    if (!this.el.careerBody) return;
+    const n = (v, d = 0) => (Number.isFinite(v) ? v.toFixed(d) : '0');
+    const kpis = [
+      { k: 'MAÇ', v: sum.matches },
+      { k: 'KAZANMA', v: `${n(sum.winRate, 1)}%` },
+      { k: 'K/D', v: n(sum.kd, 2) },
+      { k: 'İSABET', v: `${n(sum.accuracy, 1)}%` },
+      { k: 'HS', v: `${n(sum.hsPercent, 1)}%` },
+      { k: 'ADR', v: n(sum.adr, 1) },
+      { k: 'RATING', v: n(sum.rating, 2) },
+      { k: 'MVP', v: sum.mvps },
+    ];
+    const weaponRows = (sum.topWeapons || []).map((w) => {
+      const name = CS_WEAPONS[w.id]?.name || w.id.toUpperCase();
+      const max = sum.topWeapons[0]?.kills || 1;
+      return `<li><span class="cw-name">${name}</span>
+        <span class="cw-bar"><i style="width:${Math.round((w.kills / max) * 100)}%"></i></span>
+        <b>${w.kills}</b></li>`;
+    }).join('') || '<li class="empty">Henüz kill yok — bir maç oyna.</li>';
+
+    const mapRows = Object.entries(sum.maps || {}).map(([id, row]) => {
+      const rate = row.played ? (row.won / row.played) * 100 : 0;
+      return `<tr><td>${id.replace('de_', '').toUpperCase()}</td><td>${row.played}</td>
+        <td>${row.won}</td><td>${rate.toFixed(0)}%</td><td>${row.kills}</td><td>${row.deaths}</td></tr>`;
+    }).join('') || '<tr><td colspan="6" class="empty">Henüz harita kaydı yok.</td></tr>';
+
+    const histRows = (sum.history || []).map((h) => {
+      const d = new Date(h.at || Date.now());
+      const label = h.draw ? 'BERABERE' : (h.win ? 'GALİBİYET' : 'MAĞLUBİYET');
+      const cls = h.draw ? 'draw' : (h.win ? 'win' : 'loss');
+      return `<li class="${cls}"><span>${h.map.replace('de_', '').toUpperCase()}</span>
+        <span>${h.ally} : ${h.enemy}</span>
+        <span>${h.kills}/${h.deaths}</span>
+        <span>${d.toLocaleDateString('tr-TR')}</span>
+        <b>${label}</b></li>`;
+    }).join('') || '<li class="empty">Kayıtlı maç yok.</li>';
+
+    this.el.careerBody.innerHTML = `
+      <div class="career-kpis">${kpis.map((x) => `<div class="ck"><b>${x.v}</b><span>${x.k}</span></div>`).join('')}</div>
+      <div class="career-cols">
+        <section><h3>EN ÇOK KULLANILAN SİLAHLAR</h3><ul class="cw-list">${weaponRows}</ul></section>
+        <section><h3>HARİTA PERFORMANSI</h3>
+          <table class="cm-table"><thead><tr><th>HARİTA</th><th>M</th><th>G</th><th>%</th><th>K</th><th>D</th></tr></thead>
+          <tbody>${mapRows}</tbody></table>
+        </section>
+      </div>
+      <section class="career-history"><h3>SON MAÇLAR</h3><ul>${histRows}</ul></section>
+      <p class="career-foot">Toplam ${sum.kills} kill · ${sum.deaths} ölüm · ${sum.rounds} round ·
+        ${sum.plants} bomba kurulumu · ${sum.defuses} çözüm · ${sum.aces} ace</p>`;
   }
 
   /* ---------------- hero / slideshow art ---------------- */

@@ -8,16 +8,19 @@ import { Actor, ACTOR_RADIUS, ACTOR_HEIGHT } from './actor.js';
 import { getWeapon, WEAPONS, BUY_ORDER, BUY_GROUPS } from './weapons.js';
 import { AGENTS, AGENT_LIST } from './agents.js';
 import { audio } from '../core/audio.js';
+import { recordMatch, loadProfile, profileSummary } from './profile.js';
 import { clamp, rand, choice, shuffle, rayBoxes, boxFromCenter, resolveCircleBoxXZ, distance2D, angleDiff } from '../core/utils.js';
 import { PLANT_SPOTS, HOLD_SPOTS, SPAWNS, SITES, MAP_BOUNDS, ATTACK_PATHS, CURRENT_MAP } from '../world/mapLayout.js';
 
 const BUY_TIME = 20;
 const LIVE_TIME = 100;
 const SPIKE_TIME = 45;
-const PLANT_TIME = 4;
-const DEFUSE_TIME = 7;
+const PLANT_TIME = 3.2;
+const DEFUSE_TIME = 10;      // sans kit
+const DEFUSE_TIME_KIT = 5;   // defuse kit ile
 const ROUND_END_TIME = 5.5;
-const ROUNDS_TO_WIN = 5;
+const ROUNDS_TO_WIN = 13;
+const MAX_ROUNDS = 24;
 
 const PHASE_LABEL = {
   buy: 'SATIN ALMA',
@@ -41,8 +44,13 @@ export class Game {
     this.phase = 'buy';
     this.phaseTimer = BUY_TIME;
     this.roundNumber = 0;
-    this.halfStart = 5;
+    this.lossStreak = { ally: 0, enemy: 0 };
+    this.weaponKills = {};
+    this.halfStart = 13;
     this.playerInBuyZone = true;
+    this.weaponKills = {};
+    this.lossStreak = { ally: 0, enemy: 0 };
+    this.aceCount = 0;
     this.scores = { ally: 0, enemy: 0 };
     this.attackingTeam = 'ally';
     this.attackSite = 'A';
@@ -169,7 +177,9 @@ export class Game {
 
     // initial round
     this.roundNumber = 0;
-    this.halfStart = 5;
+    this.lossStreak = { ally: 0, enemy: 0 };
+    this.weaponKills = {};
+    this.halfStart = 13;
     this.playerInBuyZone = true;
     this.startRound(true);
 
@@ -642,6 +652,7 @@ export class Game {
     this.spike.defuseProgress = 0;
     this.spike.carrier = null;
     actor.spikeCarrier = false;
+    this.spike.planterId = actor.id;
     actor.stats.plants++;
     actor.credits += 300;
     actor.addUltPoints(2);
@@ -659,6 +670,7 @@ export class Game {
   }
 
   defuseSpike(actor) {
+    actor.credits = Math.min(16000, actor.credits + 300);
     this.spike.state = 'defused';
     actor.stats.defuses++;
     actor.credits += 300;
@@ -703,17 +715,23 @@ export class Game {
     this.updatePlantProgressUI(null);
     this.updateDefuseProgressUI(null);
 
-    // economy
+    // economy: CS loss-bonus ladder 1400 → 1700 → 2000 → 2300 → 2600 → 2900
+    const loserTeam = winnerTeam === 'ally' ? 'enemy' : 'ally';
+    this.lossStreak[loserTeam] = Math.min(5, (this.lossStreak[loserTeam] || 0) + 1);
+    this.lossStreak[winnerTeam] = 0;
+    const lossBonus = 1400 + 300 * this.lossStreak[loserTeam];
     for (const a of this.actors) {
       if (a.team === winnerTeam) a.credits += 3250;
-      else a.credits += 1400;
+      else a.credits += lossBonus;
       a.credits = Math.min(a.credits, 16000);
       if (a.team === winnerTeam) a.addUltPoints(1);
     }
+    this.lastLossBonus = lossBonus;
     this.ui.setCredits(this.player.credits);
     this.ui.updateAbilities(this.player);
 
-    if (this.scores.ally >= ROUNDS_TO_WIN || this.scores.enemy >= ROUNDS_TO_WIN) {
+    if (this.scores.ally >= ROUNDS_TO_WIN || this.scores.enemy >= ROUNDS_TO_WIN
+      || this.roundNumber >= MAX_ROUNDS) {
       this.matchOver = true;
       this.phaseTimer = 999;
     }
@@ -730,9 +748,12 @@ export class Game {
   }
 
   nextRoundOrEnd() {
-    if (this.scores.ally >= ROUNDS_TO_WIN || this.scores.enemy >= ROUNDS_TO_WIN) {
+    if (this.scores.ally >= ROUNDS_TO_WIN || this.scores.enemy >= ROUNDS_TO_WIN
+      || this.roundNumber >= MAX_ROUNDS) {
       this.phase = 'matchEnd';
+      const career = this.recordCareer();
       this.ui.showMatchEnd({
+        career,
         win: this.scores.ally > this.scores.enemy,
         allyScore: this.scores.ally,
         enemyScore: this.scores.enemy,
@@ -1007,6 +1028,7 @@ export class Game {
     if (attacker && attacker !== victim) {
       attacker.kills++;
       attacker.roundKills++;
+      if (attacker.isPlayer) this.weaponKills[weaponId] = (this.weaponKills[weaponId] || 0) + 1;
       attacker.credits = Math.min(16000, attacker.credits + 300);
       attacker.addUltPoints(1);
       if (attacker.isPlayer) {
@@ -1355,8 +1377,9 @@ export class Game {
       audio.play('defuse_start', { pos: bot.pos, volume: 0.6 });
     }
     this.spike.defuseProgress += dt;
-    this.updateDefuseProgressUI(this.spike.defuseProgress / DEFUSE_TIME);
-    if (this.spike.defuseProgress >= DEFUSE_TIME) {
+    const defuseTime = this.defuseDuration(bot);
+    this.updateDefuseProgressUI(this.spike.defuseProgress / defuseTime);
+    if (this.spike.defuseProgress >= defuseTime) {
       this.spike.defuseProgress = 0;
       this.spike.defuserId = null;
       this.defuseSpike(bot);
@@ -1410,8 +1433,9 @@ export class Game {
             audio.play('defuse_start', { volume: 0.7 });
           }
           this.spike.defuseProgress += dt;
-          this.updateDefuseProgressUI(this.spike.defuseProgress / DEFUSE_TIME);
-          if (this.spike.defuseProgress >= DEFUSE_TIME) {
+          const dur = this.defuseDuration(this.player);
+          this.updateDefuseProgressUI(this.spike.defuseProgress / dur);
+          if (this.spike.defuseProgress >= dur) {
             this.spike.defuseProgress = 0;
             this.spike.defuserId = null;
             this.updateDefuseProgressUI(null);
@@ -1423,7 +1447,7 @@ export class Game {
             this.spike.defuseProgress = 0;
             this.updateDefuseProgressUI(null);
           }
-          this.ui.interactHint(`[F] SPIKE'İ ÇÖZ — ${DEFUSE_TIME} SANİYE`);
+          this.ui.interactHint(`[F] BOMBAYI ÇÖZ — ${this.defuseDuration(this.player)} SANİYE${this.player.kit ? ' (KIT)' : ''}`);
         }
         return;
       } else {
@@ -1499,6 +1523,7 @@ export class Game {
 
   update(dt) {
     this.time += dt;
+    if (this.player?.alive) this.ui?.updateCrosshairDynamics?.(this.player);
     this.playerInBuyZone = this.inBuyZone(this.player);
 
     // buy-phase timer
@@ -1742,6 +1767,11 @@ export class Game {
     return false;
   }
 
+  /** defuse time depends on the kit, exactly like CS */
+  defuseDuration(actor) {
+    return actor?.kit ? DEFUSE_TIME_KIT : DEFUSE_TIME;
+  }
+
   isPistolRound() {
     return this.roundNumber === 1 || this.roundNumber === this.halfStart;
   }
@@ -1761,6 +1791,8 @@ export class Game {
       })),
       armor: p.armor,
       helmet: p.helmet,
+      kit: !!p.kit,
+      canBuyKit: p.team !== this.attackingTeam,
       slot: p.currentSlot,
       canBuy: inBuyZone,
       timeLeft: Math.max(0, Math.ceil(this.phaseTimer)),
@@ -1793,9 +1825,11 @@ export class Game {
   buyArmor(type) {
     const p = this.player;
     if (type === 'helmet') {
+      // CS pricing: assault suit 1000, or just the 350 helmet upgrade over kevlar
+      const price = p.armor > 0 ? 350 : 1000;
       if (p.armor >= 100 && p.helmet) return false;
-      if (p.credits < 1000) return false;
-      p.credits -= 1000;
+      if (p.credits < price) return false;
+      p.credits -= price;
       p.armor = 100;
       p.helmet = true;
     } else {
@@ -1804,6 +1838,20 @@ export class Game {
       p.credits -= 650;
       p.armor = 100;
     }
+    audio.play('buy', { volume: 0.6 });
+    this.ui.setCredits(p.credits);
+    this.ui.showBuyMenu(true, this.buyData());
+    return true;
+  }
+
+  /** Defuse kit — 400$, halves the defuse time (CT only, like CS). */
+  buyKit() {
+    const p = this.player;
+    if (p.kit) return false;
+    if (p.credits < 400) return false;
+    if (p.team === this.attackingTeam) return false;
+    p.credits -= 400;
+    p.kit = true;
     audio.play('buy', { volume: 0.6 });
     this.ui.setCredits(p.credits);
     this.ui.showBuyMenu(true, this.buyData());
@@ -1829,6 +1877,37 @@ export class Game {
     this.viewmodel?.setSkinMap?.(map);
     if (this.player?.activeWeapon) this.viewmodel?.setWeapon?.(this.player.activeWeapon.id);
     for (const a of this.actors) a.refreshSkin?.(map);
+  }
+
+  /** Fold the finished match into the persistent career profile. */
+  recordCareer() {
+    const p = this.player;
+    const draw = this.scores.ally === this.scores.enemy;
+    const profile = recordMatch({
+      map: CURRENT_MAP?.id || 'de_dust2',
+      win: this.scores.ally > this.scores.enemy,
+      draw,
+      allyScore: this.scores.ally,
+      enemyScore: this.scores.enemy,
+      rounds: this.roundNumber,
+      roundsWon: this.scores.ally,
+      weapons: this.weaponKills,
+      aces: this.aceCount,
+      mvp: this.scores.ally > this.scores.enemy && p.kills >= Math.max(10, this.roundNumber),
+      player: {
+        kills: p.kills,
+        deaths: p.deaths,
+        assists: p.assists || 0,
+        headshots: p.shotStats.headshots,
+        shots: p.shotStats.shots,
+        hits: p.shotStats.hits,
+        damage: Math.round(p.damageDealt),
+        plants: p.stats.plants,
+        defuses: p.stats.defuses,
+      },
+    });
+    this.lastCareer = profileSummary(profile);
+    return this.lastCareer;
   }
 
   scoreboardData() {
@@ -1858,7 +1937,9 @@ export class Game {
   restartMatch() {
     this.scores = { ally: 0, enemy: 0 };
     this.roundNumber = 0;
-    this.halfStart = 5;
+    this.lossStreak = { ally: 0, enemy: 0 };
+    this.weaponKills = {};
+    this.halfStart = 13;
     this.playerInBuyZone = true;
     this.roundHistory = [];
     this.matchOver = false;

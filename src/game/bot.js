@@ -678,12 +678,15 @@ export class Bot extends Actor {
 
     // Counter-Strike economy: full buy when the money is there, eco otherwise
     const roll = Math.random();
-    if (cred >= 4750 && roll < 0.16) primary = 'awp';
+    // CS buy tiers: full buy → force buy → eco
+    if (cred >= 4750 && roll < 0.18) primary = 'awp';
     else if (cred >= 3100) primary = roll < 0.5 ? loadout.primary : (Math.random() < 0.5 ? 'ak47' : 'm4a4');
-    else if (cred >= 2700) primary = roll < 0.55 ? 'ak47' : 'mp9';
-    else if (cred >= 1700) primary = roll < 0.5 ? 'ssg08' : 'mp9';
+    else if (cred >= 2700) primary = 'ak47';
+    else if (cred >= 2000) primary = roll < 0.5 ? 'galil' : 'famas';
+    else if (cred >= 1700) primary = roll < 0.5 ? 'ssg08' : 'ump45';
     else if (cred >= 1250) primary = 'mp9';
     else if (cred >= 1050) primary = 'mac10';
+    else if (cred >= 700) primary = null;
 
     if (primary && getWeapon(primary).price <= cred) {
       this.credits -= getWeapon(primary).price;

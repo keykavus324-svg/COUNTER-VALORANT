@@ -34,6 +34,7 @@ export class Actor {
     this.health = 100;
     this.maxHealth = 100;
     this.armor = 0;
+    this.kit = false;
     this.helmet = false;
     this.tagAmount = 0;
     this.alive = true;
@@ -89,6 +90,8 @@ export class Actor {
 
     this.spikeCarrier = false;
     this.stats = { plants: 0, defuses: 0 };
+    // lifetime-per-match counters used by the career profile
+    this.shotStats = { shots: 0, hits: 0, headshots: 0 };
     this.hitBoxes = { head: null, body: null, legs: null };
     this.grounded = true;
     this.moveTarget = null;
@@ -243,6 +246,7 @@ export class Actor {
     }
 
     a.mag--;
+    this.shotStats.shots++;
     this.fireCooldown = 60 / w.rpm;
     this.shotIndex = Math.min(14, this.shotIndex + 1);
     this.lastShotTime = performance.now() / 1000;
@@ -320,6 +324,10 @@ export class Actor {
   /* ---------------------------------------------------------------- */
   takeDamage(amount, { attacker = null, weaponId = 'glock', headshot = false, point = null } = {}) {
     if (!this.alive || this.game.phase === 'matchEnd') return;
+    if (attacker && attacker !== this && attacker.shotStats) {
+      attacker.shotStats.hits++;
+      if (headshot) attacker.shotStats.headshots++;
+    }
     let dmg = amount;
     // CS armour: kevlar halves body damage, a helmet is required before it
     // does anything against headshots.
