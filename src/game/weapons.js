@@ -84,15 +84,101 @@ export const WEAPONS = {
     moveMult: 0.82, ads: 4.6, scope: true, buyable: true, color: '#38424a',
     desc: 'Gövdeye tek isabet, tek ölüm. Her mermi bir servet.',
   },
+  nova: {
+    id: 'nova', name: 'NOVA', type: 'AV TÜFEĞİ', price: 1050, slot: 1,
+    damage: 16, pellets: 9, headMult: 2.6, rpm: 68, mag: 8, reserve: 32,
+    auto: false, spread: 4.8, recoil: 3.1, range: 24, reload: 0.55, reloadShell: true,
+    moveMult: 1.0, ads: 1.0, buyable: true, color: '#5a4636',
+    desc: 'Ucuz pompalı. Yakın mesafede tek isabette öldürür, uzakta işe yaramaz.',
+  },
+  xm1014: {
+    id: 'xm1014', name: 'XM1014', type: 'AV TÜFEĞİ', price: 2000, slot: 1,
+    damage: 14, pellets: 8, headMult: 2.4, rpm: 240, mag: 7, reserve: 32,
+    auto: true, spread: 4.2, recoil: 2.4, range: 26, reload: 0.6, reloadShell: true,
+    moveMult: 1.0, ads: 1.0, buyable: true, color: '#46423a',
+    desc: 'Yarı otomatik pompalı. Site girişlerinde seri temizlik.',
+  },
+  ump45: {
+    id: 'ump45', name: 'UMP-45', type: 'HAFİF MAKİNELİ', price: 1200, slot: 1,
+    damage: 35, headMult: 3.2, rpm: 666, mag: 25, reserve: 100,
+    auto: true, spread: 1.35, recoil: 1.05, range: 50, reload: 2.2,
+    moveMult: 1.02, ads: 1.2, buyable: true, color: '#4a4740',
+    desc: 'Yavaş ama sert SMG. Eko turunda zırh deler.',
+  },
+  mp7: {
+    id: 'mp7', name: 'MP7', type: 'HAFİF MAKİNELİ', price: 1500, slot: 1,
+    damage: 29, headMult: 3.0, rpm: 750, mag: 30, reserve: 120,
+    auto: true, spread: 1.5, recoil: 0.9, range: 46, reload: 2.0,
+    moveMult: 1.02, ads: 1.18, buyable: true, color: '#3f4348',
+    desc: 'Dengeli SMG. Yakın-orta mesafede güvenli seçim.',
+  },
+  galil: {
+    id: 'galil', name: 'GALIL AR', type: 'TÜFEK', price: 1800, slot: 1,
+    damage: 30, headMult: 3.6, rpm: 666, mag: 35, reserve: 90,
+    auto: true, spread: 1.2, recoil: 1.8, range: 100, reload: 2.4,
+    moveMult: 0.97, ads: 1.22, buyable: true, color: '#4a4436',
+    desc: 'Ucuz tüfek. AK alamadığın turda iş görür.',
+  },
+  famas: {
+    id: 'famas', name: 'FAMAS', type: 'TÜFEK', price: 2050, slot: 1,
+    damage: 30, headMult: 3.4, rpm: 666, mag: 25, reserve: 90,
+    auto: true, spread: 1.1, recoil: 1.7, range: 100, reload: 2.3,
+    moveMult: 0.97, ads: 1.24, buyable: true, color: '#3c4148',
+    desc: 'CT eko tüfeği. Şarjörü küçük, kontrolü kolay.',
+  },
+  aug: {
+    id: 'aug', name: 'AUG', type: 'TÜFEK', price: 3300, slot: 1,
+    damage: 32, headMult: 3.9, rpm: 620, mag: 30, reserve: 90,
+    auto: true, spread: 0.8, recoil: 1.65, range: 115, reload: 2.6,
+    moveMult: 0.95, ads: 2.2, scope: true, buyable: true, color: '#3d4450',
+    desc: 'Dürbünlü tüfek. Yakın mesafede dürbünü kapat, uzakta aç.',
+  },
+  sg553: {
+    id: 'sg553', name: 'SG 553', type: 'TÜFEK', price: 3000, slot: 1,
+    damage: 34, headMult: 4.0, rpm: 545, mag: 30, reserve: 90,
+    auto: true, spread: 0.85, recoil: 2.05, range: 120, reload: 2.5,
+    moveMult: 0.95, ads: 2.2, scope: true, buyable: true, color: '#4a4336',
+    desc: 'AK muadili dürbünlü tüfek. Tek kafa, hızlı re-take.',
+  },
+  m249: {
+    id: 'm249', name: 'M249', type: 'MİNİGUN', price: 5200, slot: 1,
+    damage: 32, headMult: 2.6, rpm: 750, mag: 100, reserve: 200,
+    auto: true, spread: 1.8, recoil: 1.6, range: 100, reload: 5.7,
+    moveMult: 0.86, ads: 1.3, buyable: true, color: '#3a4038',
+    desc: 'Ağır makineli. 100 mermi, cehennem gibi baskı — ama pahalı.',
+  },
 };
 
-export const BUY_ORDER = ['p250', 'deagle', 'mac10', 'mp9', 'ssg08', 'ak47', 'm4a4', 'awp'];
+export const BUY_ORDER = [
+  'p250', 'deagle', 'mac10', 'mp9', 'ump45', 'mp7',
+  'nova', 'xm1014', 'galil', 'famas', 'ak47', 'm4a4', 'aug', 'sg553',
+  'ssg08', 'awp', 'm249',
+];
+
+/** Buy menu categories (CS style columns). */
+export const BUY_GROUPS = [
+  { id: 'pistol', label: 'TABANCALAR', items: ['p250', 'deagle'] },
+  { id: 'smg', label: 'HAFİF MAKİNELİ', items: ['mac10', 'mp9', 'ump45', 'mp7'] },
+  { id: 'shotgun', label: 'AV TÜFEKLERİ', items: ['nova', 'xm1014'] },
+  { id: 'rifle', label: 'TÜFEKLER', items: ['galil', 'famas', 'ak47', 'm4a4', 'aug', 'sg553'] },
+  { id: 'sniper', label: 'KESKİN NİŞANCILAR', items: ['ssg08', 'awp'] },
+  { id: 'heavy', label: 'AĞIR', items: ['m249'] },
+];
 
 /** Every weapon id renders with one of the procedural models below. */
 export const WEAPON_SHAPE = {
   knife: 'knife', glock: 'classic', usp_s: 'ghost', p250: 'classic', deagle: 'sheriff',
-  mac10: 'spectre', mp9: 'spectre', ssg08: 'operator', ak47: 'vandal', m4a4: 'phantom', awp: 'operator',
+  mac10: 'spectre', mp9: 'spectre', ump45: 'spectre', mp7: 'spectre',
+  nova: 'judge', xm1014: 'judge',
+  galil: 'bulldog', famas: 'bulldog', ak47: 'vandal', m4a4: 'phantom',
+  aug: 'phantom', sg553: 'vandal',
+  ssg08: 'operator', awp: 'operator', m249: 'odin',
 };
+
+/** Icon silhouettes are keyed by shape, so new weapons reuse them. */
+export function weaponIconKey(id) {
+  return WEAPON_SHAPE[id] || id;
+}
 
 export function getWeapon(id) {
   return WEAPONS[id] || WEAPONS.glock;
@@ -342,9 +428,7 @@ export function buildWeaponModel(id, viewmodel = true, skinMap = null) {
 }
 
 /** Tiny SVG silhouettes for the buy menu. */
-export function weaponIconSVG(id) {
-  const common = 'viewBox="0 0 120 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"';
-  const shapes = {
+const SVG_SHAPES = {
     knife: '<path d="M18 34 L60 12 L66 16 L30 38 Z"/><rect x="62" y="14" width="26" height="6" transform="rotate(-20 62 14)"/><rect x="86" y="8" width="14" height="4" transform="rotate(-20 86 8)"/>',
     classic: '<rect x="34" y="20" width="46" height="9" rx="2"/><path d="M40 29 L50 29 L46 42 L36 42 Z"/><rect x="78" y="21" width="10" height="5"/><rect x="52" y="16" width="8" height="4"/>',
     ghost: '<rect x="30" y="20" width="58" height="8" rx="2"/><rect x="88" y="21" width="16" height="6"/><path d="M36 28 L48 28 L44 42 L32 42 Z"/><rect x="50" y="16" width="10" height="4"/>',
@@ -356,6 +440,12 @@ export function weaponIconSVG(id) {
     phantom: '<rect x="24" y="18" width="54" height="13" rx="2"/><rect x="76" y="21" width="24" height="7" rx="3"/><rect x="100" y="22" width="12" height="5"/><rect x="6" y="18" width="22" height="9"/><path d="M32 31 L42 31 L37 44 L27 44 Z"/><rect x="46" y="31" width="10" height="12"/><rect x="50" y="12" width="22" height="5"/>',
     operator: '<rect x="20" y="20" width="62" height="10" rx="2"/><rect x="80" y="21" width="34" height="5"/><rect x="114" y="19" width="6" height="9"/><rect x="46" y="10" width="34" height="7" rx="3"/><rect x="0" y="18" width="22" height="10"/><path d="M30 30 L40 30 L35 42 L25 42 Z"/><rect x="86" y="26" width="2" height="12"/><rect x="92" y="26" width="2" height="12"/>',
     odin: '<rect x="24" y="16" width="56" height="16" rx="3"/><circle cx="46" cy="34" r="11"/><rect x="78" y="20" width="30" height="6"/><rect x="104" y="18" width="8" height="9"/><rect x="8" y="18" width="18" height="10"/><path d="M60 32 L68 32 L64 44 L56 44 Z"/>',
-  };
-  return `<svg ${common} fill="currentColor">${shapes[id] || shapes.classic}</svg>`;
+};
+
+/** shape key -> inline svg children, shared by icons and skin thumbnails */
+export const WEAPON_SVG_SHAPES = SVG_SHAPES;
+
+export function weaponIconSVG(id) {
+  const key = WEAPON_SHAPE[id] || id;
+  return `<svg viewBox="0 0 120 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="currentColor">${SVG_SHAPES[key] || SVG_SHAPES.classic}</svg>`;
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { sprayOffset } from './spray.js';
 import { getWeapon, WEAPONS } from './weapons.js';
 import { AGENTS } from './agents.js';
 import { Character } from './characters.js';
@@ -33,6 +34,8 @@ export class Actor {
     this.health = 100;
     this.maxHealth = 100;
     this.armor = 0;
+    this.helmet = false;
+    this.tagAmount = 0;
     this.alive = true;
     this.crouch = false;
 
@@ -139,6 +142,12 @@ export class Actor {
     this.scoped = false;
     if (this.isPlayer) audio.play('reload', { volume: 0.35 });
     return true;
+  }
+
+  /** re-apply a skin map to the third person weapon model */
+  refreshSkin(skinMap) {
+    const id = this.slots?.[this.currentSlot];
+    if (id && this.character) this.character.setWeapon(id, skinMap);
   }
 
   giveWeapon(id) {
@@ -274,10 +283,24 @@ export class Actor {
     return true;
   }
 
+  /**
+   * CS style spray: the camera walks along the weapon's fixed pattern instead
+   * of kicking randomly, so a learned AK spray is reproducible.
+   */
   applyRecoil(w) {
-    const rec = w.recoil * (this.adsAmount > 0.6 ? 0.62 : 1);
-    this.recoilPitch = (this.recoilPitch || 0) + rec * 0.0072;
-    this.recoilYaw = (this.recoilYaw || 0) + (Math.random() - 0.5) * rec * 0.0036;
+    const recoilScale = (this.adsAmount > 0.6 ? 0.62 : 1) * (w.recoil || 1) * 0.42;
+    const prev = sprayOffset(w, Math.max(0, this.shotIndex - 2));
+    const now = sprayOffset(w, Math.max(0, this.shotIndex - 1));
+    const DEG = Math.PI / 180;
+    // the pattern is cumulative in CS; we apply the delta between shots
+    const dPitch = (now.y - prev.y) * DEG * recoilScale;
+    const dYaw = (now.x - prev.x) * DEG * recoilScale * -1;
+    // a touch of randomness keeps long sprays from being robotic
+    const jitter = w.scope ? 0.15 : 0.35;
+    this.recoilPitch = (this.recoilPitch || 0) + dPitch
+      + (Math.random() - 0.5) * dPitch * jitter;
+    this.recoilYaw = (this.recoilYaw || 0) + dYaw
+      + (Math.random() - 0.5) * Math.abs(dYaw) * jitter * 2;
   }
 
   meleeAttack(origin, dir) {
@@ -298,11 +321,18 @@ export class Actor {
   takeDamage(amount, { attacker = null, weaponId = 'glock', headshot = false, point = null } = {}) {
     if (!this.alive || this.game.phase === 'matchEnd') return;
     let dmg = amount;
+    // CS armour: kevlar halves body damage, a helmet is required before it
+    // does anything against headshots.
     if (this.armor > 0) {
-      const absorbed = Math.min(this.armor, dmg * 0.66);
-      this.armor -= absorbed;
-      dmg -= absorbed;
+      const ratio = headshot ? (this.helmet ? 0.5 : 0) : 0.5;
+      if (ratio > 0) {
+        const absorbed = Math.min(this.armor * 1.6, dmg * ratio);
+        this.armor = Math.max(0, this.armor - absorbed / 1.6);
+        dmg -= absorbed;
+      }
     }
+    // tagging: getting shot slows you down for a moment
+    this.tagAmount = Math.min(1, this.tagAmount + dmg / 60);
     if (this.shieldHp > 0) {
       const absorbed = Math.min(this.shieldHp, dmg);
       this.shieldHp -= absorbed;

@@ -142,12 +142,36 @@ function paletteFromRarity(hex) {
   return { body: `#${body.getHexString()}`, accent: `#${c.getHexString()}`, trim: `#${trim.getHexString()}` };
 }
 
+/**
+ * Every one of the 115 finishes has to read as its own paint job, even when it
+ * falls back to the rarity colour. Family palettes keep their identity; the
+ * hash only nudges hue / lightness so two Covert reds are never identical.
+ */
 export function paletteFor(skinOrName) {
   const name = typeof skinOrName === 'string' ? skinOrName : skinOrName?.full || skinOrName?.name;
   const rarity = typeof skinOrName === 'object' ? skinOrName?.color : null;
   if (!name) return DEFAULT_PALETTE;
   const hit = SKIN_PALETTES.find((p) => p.match.test(name));
-  return hit || paletteFromRarity(rarity) || DEFAULT_PALETTE;
+  const base = hit || paletteFromRarity(rarity) || DEFAULT_PALETTE;
+  const k = skinSeed(name);
+  const spread = hit ? 9 : 26;                 // family palettes stay recognisable
+  const hue = ((k % 41) - 20) / 20 * spread;   // -spread .. +spread degrees
+  const lit = (((k >> 6) % 21) - 10) / 10 * 0.07;
+  const shift = (hex, dh, dl) => {
+    if (!hex || !hex.startsWith('#')) return hex;
+    const c = new THREE.Color(hex);
+    const hsl = {};
+    c.getHSL(hsl);
+    c.setHSL((hsl.h + dh / 360 + 1) % 1, hsl.s, Math.min(0.96, Math.max(0.05, hsl.l + dl)));
+    return `#${c.getHexString()}`;
+  };
+  return {
+    body: shift(base.body, hue * 0.55, lit),
+    accent: shift(base.accent, hue, -lit * 0.5),
+    trim: shift(base.trim, -hue * 0.35, lit * 0.6),
+    family: hit ? hit.match.source : 'rarity',
+    motif: k % 6,
+  };
 }
 
 /* ------------------------------------------------------------------ */

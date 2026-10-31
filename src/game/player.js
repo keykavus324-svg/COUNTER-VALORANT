@@ -78,16 +78,17 @@ export class Player extends Actor {
   update(dt, input) {
     if (!this.alive) {
       this.updateCommon(dt);
-      this.recoilPitch = damp(this.recoilPitch, 0, 10, dt);
-      this.recoilYaw = damp(this.recoilYaw, 0, 10, dt);
+      this.recoilPitch = damp(this.recoilPitch, 0, 14, dt);
+      this.recoilYaw = damp(this.recoilYaw, 0, 14, dt);
       return;
     }
 
     const game = this.game;
 
     // ---- recoil recovery ----
-    this.recoilPitch = damp(this.recoilPitch, 0, 9.5, dt);
-    this.recoilYaw = damp(this.recoilYaw, 0, 9.5, dt);
+    this.tagAmount = Math.max(0, (this.tagAmount || 0) - dt * 2.5);
+    this.recoilPitch = damp(this.recoilPitch, 0, 5.5, dt);
+    this.recoilYaw = damp(this.recoilYaw, 0, 5.5, dt);
 
     // ---- ADS ----
     const canAds = !this.crouchBlocked();
@@ -128,6 +129,7 @@ export class Player extends Actor {
     if (this.speedBoost > 0) speed *= 1.55;
     if (this.slowTimer > 0) speed *= 0.5;
     if (this.stunned > 0) speed *= 0.7;
+    if (this.tagAmount > 0) speed *= 1 - Math.min(0.45, this.tagAmount * 0.45);
 
     if (this.crouch) {
       // crouch-walking is slower but much more accurate

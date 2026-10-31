@@ -3,9 +3,10 @@ import {
   MAP_ART, WEAPON_SKINS, skinImageUrl, loadImagePlain, detectCdn,
 } from '../game/csgoAssets.js';
 import { THEMES, MAPS, MAP_BY_ID, CURRENT_MAP, applyMap, worldToRadar } from '../world/mapLayout.js';
-import { BUY_ORDER, WEAPONS, weaponIconSVG } from '../game/weapons.js';
+import { BUY_ORDER, BUY_GROUPS, WEAPONS, weaponIconSVG } from '../game/weapons.js';
 import { WALLS, PROPS, SITES, SPAWNS, MAP_BOUNDS } from '../world/mapLayout.js';
 import { WeaponPreview } from './weaponPreview.js';
+import { skinThumbnail } from './skinThumb.js';
 import { audio } from '../core/audio.js';
 import { clamp, fmtTime, distance2D } from '../core/utils.js';
 
@@ -82,6 +83,7 @@ export class UI {
       scope: $('#scope-overlay'), crosshair: $('#crosshair'), hitmarker: $('#hitmarker'),
       damageVignette: $('#damage-vignette'), flashOverlay: $('#flash-overlay'),
       buyWeapons: $('#buy-weapons'), buyGear: $('#buy-gear'), buyCredits: $('#buy-credits'),
+      buySummary: $('#buy-summary'),
       sbAllies: $('#sb-allies'), sbEnemies: $('#sb-enemies'), sbScore: $('#sb-score'),
       agentGrid: $('#agent-grid'), adName: $('#ad-name'), adRole: $('#ad-role'), adDesc: $('#ad-desc'),
       adAbilities: $('#ad-abilities'), adArt: $('#ad-art'), adDmg: $('#ad-stat-dmg'),
@@ -496,7 +498,7 @@ export class UI {
       const skins = WEAPON_SKINS[w.id] || [];
       const eq = (this.settings.skins || {})[w.id];
       const skin = eq === 'none' ? null : (skins.find((s) => (s.id || s.uuid) === eq) || skins[0] || null);
-        this.el.weaponSkin.textContent = skin ? skin.full.toUpperCase() : '';
+      this.el.weaponSkin.textContent = skin ? skin.full.toUpperCase() : '';
       this.el.weaponSkin.style.opacity = skin ? '1' : '0';
     }
     if (w.type === 'MELEE') {
@@ -952,61 +954,84 @@ export class UI {
   }
 
   renderBuy(data) {
-    this.el.buyCredits.textContent = data.credits;
+    const credits = data.credits ?? 0;
+    this.el.buyCredits.textContent = credits;
     const p = data.weapons;
-    const buyable = BUY_ORDER.map((id) => WEAPONS[id]);
-    this.el.buyWeapons.innerHTML = buyable.map((w, i) => {
-      const owned = p.slots[1] === w.id || p.slots[2] === w.id;
-      const can = data.credits >= w.price;
-      return `<button class="buy-item keybind ${owned ? 'owned' : ''} ${!can && !owned ? 'cant' : ''}" data-weapon="${w.id}" data-key="${i + 1}">
-        <div class="bi-icon">${this.buyWeaponArt(w.id)}</div>
-        <div class="bi-name">${w.name}</div>
-        <div class="bi-type">${w.type}</div>
-        ${owned ? '<div class="bi-own">SAHİPSİN</div>' : `<div class="bi-price">₡${w.price}</div>`}
-      </button>`;
+    const groups = data.groups || BUY_GROUPS;
+
+    // ---- weapons, grouped the way the CS shop groups them ----
+    this.el.buyWeapons.innerHTML = groups.map((g) => {
+      const cards = g.items.map((id) => {
+        const w = WEAPONS[id];
+        if (!w) return '';
+        const owned = p.slots[1] === w.id || p.slots[2] === w.id;
+        const can = credits >= w.price;
+        return `<button class="buy-item ${owned ? 'owned' : ''} ${!can && !owned ? 'cant' : ''}" data-weapon="${w.id}">
+          <div class="bi-icon">${this.buyWeaponArt(w.id)}</div>
+          <div class="bi-name">${w.name}</div>
+          <div class="bi-type">${w.type} · ${w.damage} hasar</div>
+          ${owned ? '<div class="bi-own">SAHİPSİN</div>' : `<div class="bi-price">$${w.price}</div>`}
+        </button>`;
+      }).join('');
+      return `<div class="buy-group" data-group="${g.id}">
+        <div class="bg-title">${g.label}</div>
+        <div class="bg-grid">${cards}</div>
+      </div>`;
     }).join('');
 
     this._bindWeaponArtFallbacks(this.el.buyWeapons);
     this.el.buyWeapons.querySelectorAll('[data-weapon]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.weapon;
-        const ok = this.game?.buyWeapon(id);
-        if (!ok) audio.play('dryfire', { volume: 0.4 });
+        if (!this.game?.buyWeapon(id)) audio.play('dryfire', { volume: 0.4 });
       });
     });
 
-    const armorRows = [
-      { id: 'light', name: 'HAFİF KALKAN', desc: '50 kalkan', price: 400, owned: p.armor >= 50, icon: '🛡' },
-      { id: 'heavy', name: 'AĞIR KALKAN', desc: '100 kalkan', price: 1000, owned: p.armor >= 100, icon: '🛡' },
-    ];
-    const abilityRows = data.abilities.filter((a) => !a.ultimate).map((ab) => ({
-      id: `ab:${ab.id}`,
-      name: `${ab.icon} ${ab.name}`,
-      desc: `${ab.key} tuşu · ${ab.state.charges}/${ab.state.maxCharges}`,
-      price: ab.price,
-      owned: ab.state.charges >= ab.state.maxCharges,
-      icon: ab.icon,
-    }));
+    // ---- armour + utility ----
+    const gear = [];
+    gear.push({
+      id: 'kevlar', name: 'KEVLAR', desc: `Çelik yelek · ${Math.round(data.armor || 0)}%`,
+      price: 650, owned: (data.armor || 0) >= 100, icon: '🦺',
+    });
+    gear.push({
+      id: 'helmet', name: 'KEVLAR + KASK', desc: data.helmet ? 'Kask takılı — kafa vuruşu yarıya iner' : 'Kask yok — kafadan tek mermi ölüm',
+      price: 1000, owned: !!data.helmet, icon: '⛑',
+    });
+    for (const g of data.grenades || []) {
+      const st = g.state || { charges: 0, maxCharges: g.charges || 1 };
+      const max = st.maxCharges ?? g.charges ?? 1;
+      gear.push({
+        id: `ab:${g.id}`, name: `${g.name}`, desc: `${g.key} tuşu · ${st.charges}/${max} adet`,
+        price: g.price, owned: st.charges >= max, icon: g.icon,
+      });
+    }
 
-    this.el.buyGear.innerHTML = [...armorRows, ...abilityRows].map((row) => {
-      const can = data.credits >= row.price;
+    this.el.buyGear.innerHTML = gear.map((row) => {
+      const can = credits >= row.price;
       return `<button class="buy-line ${row.owned ? 'owned' : ''} ${!can && !row.owned ? 'cant' : ''}" data-gear="${row.id}">
-        <span class="bl-icon">${row.icon}</span>
-        <span>
-          <span class="bl-n">${row.name}</span><br/>
+        <span class="bl-icon">${row.icon || '•'}</span>
+        <span class="bl-text">
+          <span class="bl-n">${row.name}</span>
           <span class="bl-d">${row.desc}</span>
         </span>
-        <span class="bl-c">${row.owned ? '✓' : `₡${row.price}`}</span>
+        <span class="bl-c">${row.owned ? '✓' : `$${row.price}`}</span>
       </button>`;
     }).join('');
 
     this.el.buyGear.querySelectorAll('[data-gear]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.gear;
-        if (id === 'light' || id === 'heavy') this.game?.buyArmor(id);
+        if (id === 'kevlar' || id === 'helmet') this.game?.buyArmor(id);
         else if (id.startsWith('ab:')) this.game?.buyAbility(id.slice(3));
       });
     });
+
+    // ---- header summary ----
+    const prim = data.primary ? data.primary.name : 'YOK';
+    const sec = data.secondary ? data.secondary.name : 'YOK';
+    if (this.el.buySummary) {
+      this.el.buySummary.textContent = `BİRİNCİL: ${prim} · İKİNCİL: ${sec} · ${data.timeLeft ?? 0}s`;
+    }
   }
 
   /* ================================================================ */
@@ -1251,11 +1276,17 @@ export class UI {
       </button>`;
     }).join('');
 
-    // fill in Valve's real renders, keeping the painted placeholder on failure
+    // 1) paint a unique local preview immediately — works with no network
     this.el.svSkins.querySelectorAll('.skin-card').forEach((card) => {
       const id = card.dataset.skin;
       const slot = card.querySelector('.skin-art');
       const skin = skins.find((s) => s.id === id);
+      skinThumbnail(skin, weaponId).then((url) => {
+        if (!url || !slot.isConnected) return;
+        slot.classList.remove('skin-loading');
+        slot.innerHTML = `<img src="${url}" alt="" />`;
+      });
+      // 2) upgrade to Valve's real render when the CDN answers
       loadImagePlain(skinImageUrl(skin)).then((img) => {
         if (!img || !slot.isConnected) return;
         slot.classList.remove('skin-loading');
@@ -1272,7 +1303,8 @@ export class UI {
         }
         this.renderVaultSkins(weaponId);
         this._refreshStage();
-        this._buildWeaponArt();
+        // apply the new paint job live if a match is running
+        this.game?.refreshSkins?.();
       });
     });
   }

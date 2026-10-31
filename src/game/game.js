@@ -5,7 +5,7 @@ import { Viewmodel } from './Viewmodel.js';
 import { Player } from './player.js';
 import { Bot } from './bot.js';
 import { Actor, ACTOR_RADIUS, ACTOR_HEIGHT } from './actor.js';
-import { getWeapon, WEAPONS } from './weapons.js';
+import { getWeapon, WEAPONS, BUY_ORDER, BUY_GROUPS } from './weapons.js';
 import { AGENTS, AGENT_LIST } from './agents.js';
 import { audio } from '../core/audio.js';
 import { clamp, rand, choice, shuffle, rayBoxes, boxFromCenter, resolveCircleBoxXZ, distance2D, angleDiff } from '../core/utils.js';
@@ -41,6 +41,8 @@ export class Game {
     this.phase = 'buy';
     this.phaseTimer = BUY_TIME;
     this.roundNumber = 0;
+    this.halfStart = 5;
+    this.playerInBuyZone = true;
     this.scores = { ally: 0, enemy: 0 };
     this.attackingTeam = 'ally';
     this.attackSite = 'A';
@@ -167,6 +169,8 @@ export class Game {
 
     // initial round
     this.roundNumber = 0;
+    this.halfStart = 5;
+    this.playerInBuyZone = true;
     this.startRound(true);
 
     this.ui.setMapName?.(this.map.map?.name || 'DUST II');
@@ -460,7 +464,7 @@ export class Game {
   /* ================================================================ */
   startRound(first = false) {
     this.roundNumber++;
-    if (this.roundNumber === 5) {
+    if (this.roundNumber === this.halfStart && this.roundNumber > 1) {
       this.attackingTeam = this.attackingTeam === 'ally' ? 'enemy' : 'ally';
       this.ui.event(this.attackingTeam === 'ally' ? 'TARAF DEĞİŞTİ — SALDIRI' : 'TARAF DEĞİŞTİ — DEFANS', 4);
     }
@@ -1495,6 +1499,7 @@ export class Game {
 
   update(dt) {
     this.time += dt;
+    this.playerInBuyZone = this.inBuyZone(this.player);
 
     // buy-phase timer
     if (this.phase === 'buy') {
@@ -1722,27 +1727,58 @@ export class Game {
   /* ================================================================ */
   /* data for UI                                                       */
   /* ================================================================ */
+  /** CS buy zone: only the spawn area of your own side lets you shop. */
+  inBuyZone(actor = this.player) {
+    if (!actor || !actor.alive) return false;
+    const spawnList = actor.team === 'ally'
+      ? (this.attackingTeam === 'ally' ? SPAWNS.attacker : SPAWNS.defender)
+      : (this.attackingTeam === 'ally' ? SPAWNS.defender : SPAWNS.attacker);
+    const maxD = (CURRENT_MAP?.buyZoneRadius || 9) ** 2;
+    for (const sp of spawnList) {
+      const dx = actor.pos.x - sp.x;
+      const dz = actor.pos.z - sp.z;
+      if (dx * dx + dz * dz < maxD) return true;
+    }
+    return false;
+  }
+
+  isPistolRound() {
+    return this.roundNumber === 1 || this.roundNumber === this.halfStart;
+  }
+
   buyData() {
     const p = this.player;
+    const inBuyZone = this.phase === 'buy' || (this.playerInBuyZone && this.player.alive);
     return {
       credits: p.credits,
       weapons: p,
-      agent: p.agent,
-      abilities: p.agent.abilities.map((ab) => ({
+      groups: BUY_GROUPS,
+      grenades: p.agent.abilities.map((ab) => ({
         ...ab,
         state: p.abilityState[ab.id],
         owned: p.abilityState[ab.id].charges,
+        max: p.abilityState[ab.id].maxCharges,
       })),
       armor: p.armor,
+      helmet: p.helmet,
       slot: p.currentSlot,
+      canBuy: inBuyZone,
+      timeLeft: Math.max(0, Math.ceil(this.phaseTimer)),
+      grenadeCount: p.grenadeCount?.() ?? 0,
+      primary: p.slots[1] ? getWeapon(p.slots[1]) : null,
+      secondary: p.slots[2] ? getWeapon(p.slots[2]) : null,
+      pistolRound: this.isPistolRound?.() ?? false,
     };
   }
 
+  /** CS shop: a weapon can only be bought while standing in the buy zone. */
   buyWeapon(id) {
     const p = this.player;
     const w = getWeapon(id);
-    if (!w.buyable) return false;
+    if (!w || !w.buyable) return false;
+    if (this.phase !== 'buy' && !this.playerInBuyZone) return false;
     if (p.credits < w.price) return false;
+    if (p.slots[1] === id || p.slots[2] === id) return false;
     p.credits -= w.price;
     p.giveWeapon(id);
     audio.play('buy', { volume: 0.6 });
@@ -1753,16 +1789,20 @@ export class Game {
     return true;
   }
 
+  /** Kevlar 650 · Kevlar + Helmet 1000 — CS pricing, refills partial armour. */
   buyArmor(type) {
     const p = this.player;
-    if (type === 'heavy') {
-      if (p.credits < 1000 || p.armor >= 100) return false;
+    if (type === 'helmet') {
+      if (p.armor >= 100 && p.helmet) return false;
+      if (p.credits < 1000) return false;
       p.credits -= 1000;
       p.armor = 100;
+      p.helmet = true;
     } else {
-      if (p.credits < 650 || p.armor >= 50) return false;
+      if (p.armor >= 100) return false;
+      if (p.credits < 650) return false;
       p.credits -= 650;
-      p.armor = 50;
+      p.armor = 100;
     }
     audio.play('buy', { volume: 0.6 });
     this.ui.setCredits(p.credits);
@@ -1779,7 +1819,16 @@ export class Game {
       this.ui.showBuyMenu(true, this.buyData());
       return true;
     }
+    audio.play('dryfire', { volume: 0.35 });
     return false;
+  }
+
+  /** Re-apply equipped skins to the viewmodel and every visible actor. */
+  refreshSkins() {
+    const map = this.settings?.skins || {};
+    this.viewmodel?.setSkinMap?.(map);
+    if (this.player?.activeWeapon) this.viewmodel?.setWeapon?.(this.player.activeWeapon.id);
+    for (const a of this.actors) a.refreshSkin?.(map);
   }
 
   scoreboardData() {
@@ -1809,6 +1858,8 @@ export class Game {
   restartMatch() {
     this.scores = { ally: 0, enemy: 0 };
     this.roundNumber = 0;
+    this.halfStart = 5;
+    this.playerInBuyZone = true;
     this.roundHistory = [];
     this.matchOver = false;
     this.attackingTeam = 'ally';

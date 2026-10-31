@@ -26,7 +26,7 @@ export class WeaponPreview {
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(34, 1, 0.01, 30);
-    this.camera.position.set(0, 0.62, 2.35);
+    this.camera.position.set(0, 0.5, 2.5);
     this.camera.lookAt(0, 0, 0);
 
     const hemi = new THREE.HemisphereLight(0xdfe9f2, 0x1a222b, 1.15);
@@ -71,7 +71,7 @@ export class WeaponPreview {
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const longest = Math.max(size.z, size.y, size.x) || 1;
-    const k = 1.18 / longest;
+    const k = 1.1 / longest;
     const wrap = new THREE.Group();
     model.position.sub(center);
     wrap.add(model);
