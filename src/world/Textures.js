@@ -149,20 +149,20 @@ export function floorTiles(base = '#a7a08f', seed = 21) {
   return t;
 }
 
-export function sandGround(seed = 5) {
-  const key = `sand-${seed}`;
+export function sandGround(seed = 5, base = '#c8b28d', tint = [150, 130, 95]) {
+  const key = `sand-${seed}-${base}-${tint.join('_')}`;
   if (cache.has(key)) return cache.get(key);
   const size = 512;
   const c = makeCanvas(size);
   const ctx = c.getContext('2d');
   const rng = seededRandom(seed);
-  ctx.fillStyle = '#c8b28d';
+  ctx.fillStyle = base;
   ctx.fillRect(0, 0, size, size);
   for (let i = 0; i < 900; i++) {
     const x = rng() * size;
     const y = rng() * size;
     const r = 1 + rng() * 5;
-    ctx.fillStyle = `rgba(${150 + rng() * 70},${130 + rng() * 60},${95 + rng() * 50},${0.12 + rng() * 0.2})`;
+    ctx.fillStyle = `rgba(${tint[0] + rng() * 70},${tint[1] + rng() * 60},${tint[2] + rng() * 50},${0.12 + rng() * 0.2})`;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
@@ -183,14 +183,14 @@ export function sandGround(seed = 5) {
   return t;
 }
 
-export function crateTexture(seed = 11) {
-  const key = `crate-${seed}`;
+export function crateTexture(seed = 11, base = '#8a6a45') {
+  const key = `crate-${seed}-${base}`;
   if (cache.has(key)) return cache.get(key);
   const size = 256;
   const c = makeCanvas(size);
   const ctx = c.getContext('2d');
   const rng = seededRandom(seed);
-  ctx.fillStyle = '#8a6a45';
+  ctx.fillStyle = base;
   ctx.fillRect(0, 0, size, size);
   for (let i = 0; i < 8; i++) {
     const y = (i * size) / 8;
@@ -313,8 +313,9 @@ export function siteDecalTexture(letter = 'A', color = '#d9443f') {
   return t;
 }
 
-export function skyTexture() {
-  if (cache.has('sky')) return cache.get('sky');
+export function skyTexture(stops = null) {
+  const key = stops ? `sky-${stops.join('')}` : 'sky';
+  if (cache.has(key)) return cache.get(key);
   const w = 1024;
   const h = 512;
   const c = document.createElement('canvas');
@@ -322,12 +323,13 @@ export function skyTexture() {
   c.height = h;
   const ctx = c.getContext('2d');
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#20364a');
-  g.addColorStop(0.28, '#4a6a80');
-  g.addColorStop(0.52, '#a8a191');
-  g.addColorStop(0.62, '#e3c9a1');
-  g.addColorStop(0.7, '#d8b38a');
-  g.addColorStop(1, '#8f7f6f');
+  const st = stops || ['#20364a', '#4a6a80', '#a8a191', '#e3c9a1', '#d8b38a', '#8f7f6f'];
+  g.addColorStop(0, st[0]);
+  g.addColorStop(0.28, st[1]);
+  g.addColorStop(0.52, st[2]);
+  g.addColorStop(0.62, st[3]);
+  g.addColorStop(0.7, st[4]);
+  g.addColorStop(1, st[5]);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
   // sun glow
@@ -359,7 +361,7 @@ export function skyTexture() {
   const t = new THREE.CanvasTexture(c);
   t.mapping = THREE.EquirectangularReflectionMapping;
   t.colorSpace = THREE.SRGBColorSpace;
-  cache.set('sky', t);
+  cache.set(key, t);
   return t;
 }
 

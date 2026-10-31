@@ -8,7 +8,7 @@
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
-    "check": "node tools/navcheck.mjs && node tools/check-layout.mjs && node tools/domcheck.mjs && node tools/assetcheck.mjs && node tools/uicheck.mjs && node tools/scenecheck.mjs",
+    "check": "node tools/navcheck.mjs && node tools/check-layout.mjs && node tools/domcheck.mjs && node tools/assetcheck.mjs && node tools/themecheck.mjs && node tools/uicheck.mjs && node tools/scenecheck.mjs",
     "sim": "node tools/headless-sim.mjs",
     "test": "npm run check"
   },

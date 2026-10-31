@@ -41,17 +41,17 @@ export const agentArtUrl = (key, kind = 'fullportrait') => {
 /* maps                                                                */
 /* ------------------------------------------------------------------ */
 export const MAP_ART = [
-  { key: 'ascent', name: 'ASCENT', uuid: '7eaecc1b-4337-bbf6-6ab9-04b8f06b3319', desc: 'Venedik kanalları, açık orta ve iki büyük spike alanı.' },
-  { key: 'bind', name: 'BIND', uuid: '2c9d57ec-4431-9c5e-2939-8f9ef6dd5cba', desc: 'Fas esintili sokaklar, ışınlanma kapıları, dar koridorlar.' },
-  { key: 'haven', name: 'HAVEN', uuid: '2bee0dc9-4ffe-519b-1cbd-7fbe763a6047', desc: 'Üç spike alanı olan tek harita; savunma her yere yetişemez.' },
-  { key: 'split', name: 'SPLIT', uuid: 'd960549e-485c-e861-8d71-aa9d1aed12a2', desc: 'Tokyo silüeti, yüksek kule ve ışınlanma halatları.' },
-  { key: 'icebox', name: 'ICEBOX', uuid: 'e2ad5c54-4114-a870-9641-8ea21279579a', desc: 'Arktik liman, halatlar ve dikey oynanış.' },
-  { key: 'lotus', name: 'LOTUS', uuid: '2fe4ed3a-450a-948b-6d6b-e89a78e680a9', desc: 'Hint tapınağı; üç alan, dönen kapılar, sessiz geçişler.' },
-  { key: 'sunset', name: 'SUNSET', uuid: '92584fbe-486a-b1b2-9faa-39b0f486b498', desc: 'Los Angeles sokakları, dar mid ve yakın dövüş cepleri.' },
-  { key: 'pearl', name: 'PEARL', uuid: 'fd267378-4d1d-484f-ff52-77821ed10dc2', desc: 'Sualtı şehri, geniş mid ve uzun görüş hatları.' },
-  { key: 'breeze', name: 'BREEZE', uuid: '2fb9a4fd-47b8-4e7d-a969-74b4046ebd53', desc: 'Karayip kıyısı; uzun menzilli tüfeklerin cenneti.' },
-  { key: 'fracture', name: 'FRACTURE', uuid: 'b529448b-4d60-346e-e89e-00a4c527a405', desc: 'İki taraftan saldırılan çatlak harita; spawn baskısı.' },
-  { key: 'abyss', name: 'ABYSS', uuid: '224b0a95-48b9-f703-1bd8-67aca101a61f', desc: 'Uçurumun kenarında; düşmek de bir ölüm.' },
+  { key: 'ascent', theme: 'ascent', name: 'ASCENT', uuid: '7eaecc1b-4337-bbf6-6ab9-04b8f06b3319', desc: 'Venedik kanalları, açık orta ve iki büyük spike alanı.' },
+  { key: 'bind', theme: 'bind', name: 'BIND', uuid: '2c9d57ec-4431-9c5e-2939-8f9ef6dd5cba', desc: 'Fas esintili sokaklar, ışınlanma kapıları, dar koridorlar.' },
+  { key: 'haven', theme: 'haven', name: 'HAVEN', uuid: '2bee0dc9-4ffe-519b-1cbd-7fbe763a6047', desc: 'Üç spike alanı olan tek harita; savunma her yere yetişemez.' },
+  { key: 'split', theme: 'ascent', name: 'SPLIT', uuid: 'd960549e-485c-e861-8d71-aa9d1aed12a2', desc: 'Tokyo silüeti, yüksek kule ve ışınlanma halatları.' },
+  { key: 'icebox', theme: 'ascent', name: 'ICEBOX', uuid: 'e2ad5c54-4114-a870-9641-8ea21279579a', desc: 'Arktik liman, halatlar ve dikey oynanış.' },
+  { key: 'lotus', theme: 'haven', name: 'LOTUS', uuid: '2fe4ed3a-450a-948b-6d6b-e89a78e680a9', desc: 'Hint tapınağı; üç alan, dönen kapılar, sessiz geçişler.' },
+  { key: 'sunset', theme: 'bind', name: 'SUNSET', uuid: '92584fbe-486a-b1b2-9faa-39b0f486b498', desc: 'Los Angeles sokakları, dar mid ve yakın dövüş cepleri.' },
+  { key: 'pearl', theme: 'ascent', name: 'PEARL', uuid: 'fd267378-4d1d-484f-ff52-77821ed10dc2', desc: 'Sualtı şehri, geniş mid ve uzun görüş hatları.' },
+  { key: 'breeze', theme: 'dune', name: 'BREEZE', uuid: '2fb9a4fd-47b8-4e7d-a969-74b4046ebd53', desc: 'Karayip kıyısı; uzun menzilli tüfeklerin cenneti.' },
+  { key: 'fracture', theme: 'dune', name: 'FRACTURE', uuid: 'b529448b-4d60-346e-e89e-00a4c527a405', desc: 'İki taraftan saldırılan çatlak harita; spawn baskısı.' },
+  { key: 'abyss', theme: 'haven', name: 'ABYSS', uuid: '224b0a95-48b9-f703-1bd8-67aca101a61f', desc: 'Uçurumun kenarında; düşmek de bir ölüm.' },
 ];
 
 export const mapArtUrl = (uuid, kind = 'splash') => {

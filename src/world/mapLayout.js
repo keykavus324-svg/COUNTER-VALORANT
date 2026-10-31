@@ -338,3 +338,49 @@ export const ATTACK_ROUTES = {
   B: ['yard', 'bmain', 'siteB'],
   mid: ['yard', 'mid', 'ct'],
 };
+
+
+/** Cosmetic palettes so the same layout can be played in the visual language of
+ *  different Valorant maps (Ascent's pale stone, Bind's terracotta, ...). */
+export const THEMES = {
+  dune: {
+    label: 'DUNE',
+    desc: 'Çöl arenası — orijinal harita.',
+    wall: ['#c3b8a3', '#ab9f8a'], wallDark: ['#8f8574', '#7a7163'],
+    floor: '#a7a08f', lane: '#9d9686', spawn: '#8b8778',
+    ground: '#c8b28d', groundTint: [150, 130, 95], ground2: '#9a8567',
+    crate: '#8a6a45',
+    sky: ['#20364a', '#4a6a80', '#a8a191', '#e3c9a1', '#d8b38a', '#8f7f6f'],
+    sun: 0xffe4bd, hemi: [0xcfe6f5, 0x6d5a41],
+  },
+  ascent: {
+    label: 'ASCENT',
+    desc: 'Venedik — açık mavi gökyüzü, fildişi taş.',
+    wall: ['#d9d3c6', '#c2bbac'], wallDark: ['#b0a99a', '#9a9384'],
+    floor: '#b9b3a4', lane: '#a9a496', spawn: '#9c9788',
+    ground: '#cbc6b8', groundTint: [200, 196, 186], ground2: '#a8a396',
+    crate: '#8f7a53',
+    sky: ['#12233a', '#2a5a8a', '#7fb0d8', '#cfe6f2', '#a8c8dc', '#6a8598'],
+    sun: 0xfff4e2, hemi: [0xdcefff, 0x6b6455],
+  },
+  bind: {
+    label: 'BIND',
+    desc: 'Fas — kızıl toprak, kiremit duvarlar.',
+    wall: ['#c9a184', '#b08a6c'], wallDark: ['#9a7357', '#82604a'],
+    floor: '#b29178', lane: '#a5856c', spawn: '#94765f',
+    ground: '#c09068', groundTint: [176, 116, 84], ground2: '#8c5f42',
+    crate: '#7d5636',
+    sky: ['#2a1c2c', '#6a3444', '#c07a6a', '#f0c8a8', '#d8a488', '#a87a72'],
+    sun: 0xffd9b0, hemi: [0xf0d8c8, 0x6a4436],
+  },
+  haven: {
+    label: 'HAVEN',
+    desc: 'Tibet manastırı — yosun yeşili, sisli ışık.',
+    wall: ['#bcc0ac', '#a4a893'], wallDark: ['#8a8f7c', '#737866'],
+    floor: '#a8ab98', lane: '#989b89', spawn: '#8b8e7d',
+    ground: '#b5b79f', groundTint: [170, 172, 150], ground2: '#8d9078',
+    crate: '#7a6b4a',
+    sky: ['#1b2a30', '#3f5f63', '#8faeae', '#dbe6dc', '#b9cabb', '#7d8f86'],
+    sun: 0xf2f6e8, hemi: [0xe2f0e6, 0x5c6152],
+  },
+};

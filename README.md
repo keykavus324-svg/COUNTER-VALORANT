@@ -120,7 +120,19 @@ Split, Icebox, Lotus, Sunset, Pearl, Breeze, Fracture, Abyss) resmi görseli ve
 kısa tanıtımı yer alır. Ana menü ve yükleme ekranının arka planı da gerçek harita
 görselleriyle döner.
 
-## Harita — DUNE
+## Harita — DUNE (4 tema)
+
+Aynı yerleşim dört farklı görsel kimlikle oynanabilir; **HARİTALAR** ekranından
+gerçek harita görseline tıklayınca arena o palete bürünür:
+
+| Tema | Görsel kimlik |
+| --- | --- |
+| **DUNE** | Çöl arenası (varsayılan) |
+| **ASCENT** | Fildişi taş, açık mavi gökyüzü |
+| **BIND** | Kızıl toprak, kiremit duvarlar |
+| **HAVEN** | Yosun yeşili, sisli ışık |
+
+## Harita yerleşimi
 
 Çöl temalı, simetrik olmayan 5 koridorlu harita (~66 × 66 m):
 **A Main / A Conn / Mid / B Conn / B Main** → iki spike alanı → CT ve savunma spawn'ı.

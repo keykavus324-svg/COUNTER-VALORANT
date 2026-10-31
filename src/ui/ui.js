@@ -2,6 +2,7 @@ import { AGENT_LIST, AGENTS, agentPortraitSVG } from '../game/agents.js';
 import {
   MAP_ART, WEAPON_SKINS, agentArtUrl, mapArtUrl, skinIconUrl, loadImagePlain, detectCdn,
 } from '../game/valoAssets.js';
+import { THEMES } from '../world/mapLayout.js';
 import { BUY_ORDER, WEAPONS, weaponIconSVG } from '../game/weapons.js';
 import { WALLS, PROPS, SITES, SPAWNS, MAP_BOUNDS } from '../world/mapLayout.js';
 import { audio } from '../core/audio.js';
@@ -23,6 +24,8 @@ const DEFAULT_SETTINGS = {
   chDot: true,
   agentId: 'blaze',
   botDifficulty: 'normal',
+  theme: 'dune',
+  skins: {},
 };
 
 export class UI {
@@ -1123,6 +1126,14 @@ export class UI {
     }
   }
 
+  setMenuThemeLabel() {
+    const theme = THEMES[this.settings.theme || 'dune'] || THEMES.dune;
+    const label = document.querySelector('#as-side b');
+    if (label) label.textContent = theme.label;
+    const foot = document.querySelector('.as-map b');
+    if (foot) foot.textContent = theme.label;
+  }
+
   _startMenuSlideshow() {
     clearInterval(this.menuSlideTimer);
     const maps = MAP_ART.filter((m) => m.uuid);
@@ -1173,7 +1184,7 @@ export class UI {
       const isOn = skin.uuid === activeUuid;
       return `<button class="skin-card ${isOn ? 'equipped' : ''}" data-skin="${skin.uuid}">
         <div class="skin-badge">KUŞANILDI</div>
-        <div class="skin-art"><span class="skin-fallback">🔫</span></div>
+        <div class="skin-art skin-loading">${weaponIconSVG(weaponId)}</div>
         <div class="skin-name">${skin.name.toUpperCase()}<small>${weaponId.toUpperCase()} · VALORANT</small></div>
       </button>`;
     }).join('');
@@ -1184,6 +1195,7 @@ export class UI {
       const slot = card.querySelector('.skin-art');
       loadImagePlain(skinIconUrl(uuid)).then((img) => {
         if (!img || !slot.isConnected) return;
+        slot.classList.remove('skin-loading');
         slot.innerHTML = `<img src="${img.src}" alt="" />`;
       });
       card.addEventListener('click', () => {
@@ -1209,12 +1221,27 @@ export class UI {
 
   renderMaps() {
     if (!this.el.mapsGrid) return;
+    const activeTheme = this.settings.theme || 'dune';
     this.el.mapsGrid.innerHTML = MAP_ART.map((m) => `
-      <div class="map-card">
+      <div class="map-card ${m.theme === activeTheme ? 'active' : ''}" data-theme="${m.theme || 'dune'}" title="Bu tema ile oyna">
         <div class="map-fallback">${m.name}</div>
         <img data-map="${m.uuid}" alt="${m.name}" style="opacity:0" />
         <div class="map-tag">${m.name}<small>${m.desc}</small></div>
       </div>`).join('');
+
+    // clicking a real map switches the arena palette and starts the match flow
+    this.el.mapsGrid.querySelectorAll('[data-theme]').forEach((card) => {
+      card.addEventListener('click', () => {
+        const theme = card.dataset.theme;
+        if (!THEMES[theme]) return;
+        this.settings.theme = theme;
+        this.save();
+        audio.play('ui_click');
+        this.showMapsGallery(false);
+        this.toast(`<b>${THEMES[theme].label}</b> teması seçildi — sonraki maçta uygulanır`, 2.6);
+        this.setMenuThemeLabel();
+      });
+    });
     this.el.mapsGrid.querySelectorAll('img[data-map]').forEach((img) => {
       loadImagePlain(mapArtUrl(img.dataset.map, 'list')).then((res) => {
         if (!res || !img.isConnected) return;

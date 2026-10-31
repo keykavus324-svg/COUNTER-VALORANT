@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   WALLS, PROPS, FLOORS, SITES, SPAWNS, NAV_NODES, MAP_BOUNDS,
-  PLANT_SPOTS, HOLD_SPOTS, POST_PLANT_SPOTS, WALL_HEIGHT,
+  PLANT_SPOTS, HOLD_SPOTS, POST_PLANT_SPOTS, WALL_HEIGHT, THEMES,
 } from './mapLayout.js';
 import {
   wallPanel, floorTiles, sandGround, crateTexture, metalPanel, fabric,
@@ -53,9 +53,11 @@ function floorMat(tex, w, d, tint = 0xffffff, extra = {}) {
 
 /* ------------------------------------------------------------------ */
 export class GameMap {
-  constructor(scene, quality = 'medium') {
+  constructor(scene, quality = 'medium', themeId = 'dune') {
     this.scene = scene;
     this.quality = quality;
+    this.themeId = THEMES[themeId] ? themeId : 'dune';
+    this.theme = THEMES[this.themeId];
     this.group = new THREE.Group();
     this.group.name = 'map';
     scene.add(this.group);
@@ -92,13 +94,13 @@ export class GameMap {
   /* ---------------------------------------------------------------- */
   _buildLights() {
     const scene = this.scene;
-    const hemi = new THREE.HemisphereLight(0xcfe6f5, 0x6d5a41, 0.95);
+    const hemi = new THREE.HemisphereLight(this.theme.hemi[0], this.theme.hemi[1], 0.95);
     scene.add(hemi);
 
     const amb = new THREE.AmbientLight(0xffffff, 0.28);
     scene.add(amb);
 
-    const sun = new THREE.DirectionalLight(0xffe4bd, 2.35);
+    const sun = new THREE.DirectionalLight(this.theme.sun, 2.35);
     sun.position.set(38, 52, 26);
     sun.target.position.set(0, 0, -4);
     scene.add(sun.target);
@@ -132,7 +134,7 @@ export class GameMap {
   _buildSky() {
     const sky = new THREE.Mesh(
       new THREE.SphereGeometry(260, 32, 20),
-      new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, fog: false, depthWrite: false })
+      new THREE.MeshBasicMaterial({ map: skyTexture(this.theme.sky), side: THREE.BackSide, fog: false, depthWrite: false })
     );
     sky.rotation.y = 1.1;
     this.group.add(sky);
@@ -174,10 +176,11 @@ export class GameMap {
   }
 
   _buildFloors() {
-    const groundTex = sandGround();
-    const tileTex = floorTiles();
-    const laneTex = floorTiles('#9d9686', 33);
-    const spawnTex = floorTiles('#8b8778', 51);
+    const th = this.theme;
+    const groundTex = sandGround(5, th.ground, th.groundTint);
+    const tileTex = floorTiles(th.floor);
+    const laneTex = floorTiles(th.lane, 33);
+    const spawnTex = floorTiles(th.spawn, 51);
 
     for (const [x, z, w, d, mat] of FLOORS) {
       let tex = groundTex;
@@ -229,7 +232,7 @@ export class GameMap {
     // shadow catcher plane just below everything
     const shadowPlane = new THREE.Mesh(
       new THREE.PlaneGeometry(140, 140),
-      new THREE.MeshStandardMaterial({ color: 0x9a8567, roughness: 1 })
+      new THREE.MeshStandardMaterial({ color: new THREE.Color(th.ground2), roughness: 1 })
     );
     shadowPlane.rotation.x = -Math.PI / 2;
     shadowPlane.position.y = -0.05;
@@ -238,8 +241,9 @@ export class GameMap {
   }
 
   _buildWalls() {
-    const concrete = wallPanel('#c3b8a3', '#ab9f8a', 7);
-    const concreteDark = wallPanel('#8f8574', '#7a7163', 17);
+    const th = this.theme;
+    const concrete = wallPanel(th.wall[0], th.wall[1], 7);
+    const concreteDark = wallPanel(th.wallDark[0], th.wallDark[1], 17);
     const metal = metalPanel(3);
     const fabricBlue = fabric('#2f5570', 13);
     const fabricRed = fabric('#7d2f33', 19);
@@ -309,7 +313,7 @@ export class GameMap {
   }
 
   _buildProps() {
-    const crateTex = crateTexture();
+    const crateTex = crateTexture(11, this.theme.crate);
     const bagTex = fabric('#8d7f63', 23);
     const barrelTex = metalPanel(9);
 

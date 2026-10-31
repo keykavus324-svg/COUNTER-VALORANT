@@ -555,6 +555,9 @@ input[type="checkbox"] { accent-color: var(--red); }
 .skin-art { height: 96px; display: flex; align-items: center; justify-content: center; }
 .skin-art img { max-width: 100%; max-height: 96px; object-fit: contain; filter: drop-shadow(0 6px 14px rgba(0,0,0,.55)); }
 .skin-art .skin-fallback { font-size: 42px; opacity: .35; }
+.skin-art svg { width: 78%; max-height: 74px; opacity: .22; }
+.skin-art.skin-loading svg { animation: skinPulse 1.4s ease-in-out infinite; }
+@keyframes skinPulse { 0%,100% { opacity: .12; } 50% { opacity: .3; } }
 .skin-name { font-size: 12px; font-weight: 800; letter-spacing: .1em; color: #e9eef2; }
 .skin-name small { display: block; font-size: 9px; font-weight: 600; letter-spacing: .16em; color: #7e93a2; margin-top: 3px; }
 .skin-badge {
@@ -612,3 +615,10 @@ input[type="checkbox"] { accent-color: var(--red); }
 
 /* buy menu real weapon renders */
 .bi-icon img { max-width: 100%; max-height: 56px; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0,0,0,.5)); }
+
+.map-card { cursor: pointer; transition: border-color .2s, transform .2s; }
+.map-card:hover { border-color: rgba(255,70,85,.6); }
+.map-card.active { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal) inset; }
+.map-card.active .map-tag::after {
+  content: 'SEÇİLİ'; margin-left: 8px; font-size: 8px; letter-spacing: .18em; color: var(--teal);
+}

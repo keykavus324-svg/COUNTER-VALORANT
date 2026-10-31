@@ -120,7 +120,7 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(this.settings.fov || 90, aspect, 0.05, 420);
     this.camera.rotation.order = 'YXZ';
 
-    this.map = new GameMap(this.scene, quality);
+    this.map = new GameMap(this.scene, quality, this.settings.theme || 'dune');
     this.effects = new Effects(this.scene, quality);
     this.viewmodel = new Viewmodel(renderer, quality);
 
@@ -169,7 +169,7 @@ export class Game {
     this.roundNumber = 0;
     this.startRound(true);
 
-    this.ui.setMapName?.('DUNE');
+    this.ui.setMapName?.(this.map.theme?.label || 'DUNE');
     return this;
   }
 
