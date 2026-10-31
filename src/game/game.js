@@ -10,6 +10,7 @@ import { AGENTS, AGENT_LIST } from './agents.js';
 import { audio } from '../core/audio.js';
 import { recordMatch, loadProfile, profileSummary, bumpStatTrak } from './profile.js';
 import { Grenade, GRENADE_TUNING } from './grenade.js';
+import { falloffAt, hitboxAt } from '../data/ballistics.js';
 import { clamp, rand, choice, shuffle, rayBoxes, boxFromCenter, resolveCircleBoxXZ, distance2D, angleDiff } from '../core/utils.js';
 import { PLANT_SPOTS, HOLD_SPOTS, SPAWNS, SITES, MAP_BOUNDS, ATTACK_PATHS, CURRENT_MAP } from '../world/mapLayout.js';
 
@@ -944,13 +945,10 @@ export class Game {
       endPoint = new THREE.Vector3(bestActor.point.x, bestActor.point.y, bestActor.point.z);
       const dist = bestActorDist;
       const w = weapon;
-      let dmg = w.damage;
-      if (bestActor.zone === 'head') dmg *= w.headMult;
-      else if (bestActor.zone === 'legs') dmg *= 0.78;
-      // damage falloff with distance
-      const falloffStart = w.range * 0.35;
-      const falloff = clamp(1 - Math.max(0, dist - falloffStart) / (w.range * 1.4), 0.55, 1);
-      dmg *= falloff;
+      // generated ballistics: hitbox zones, distance falloff and armour
+      const zoneKey = bestActor.zone === 'head' ? 'head'
+        : bestActor.zone === 'legs' ? 'leg' : 'chest';
+      const dmg = w.damage * hitboxAt(w.id, zoneKey) * falloffAt(w.id, dist);
 
       const hitPoint = new THREE.Vector3(bestActor.point.x, bestActor.point.y, bestActor.point.z);
       bestActor.actor.takeDamage(dmg, {

@@ -50,11 +50,25 @@ npm run dev      # http://localhost:5173
 | V | silahı incele (kaplamayı göster) |
 | Tab / Esc | skor tablosu / duraklat |
 
+## Mimari
+
+| Katman | Dosyalar | Ne yapar |
+| --- | --- | --- |
+| Harita verisi | `src/data/maps/*.js` (90.000+ satır) | CS2 radar'ından üretilmiş çarpışma kutuları, waypoint grafiği, cover skorları ve taktik noktaları — yükleme anında hesap yok |
+| Oyun verisi | `src/data/ballistics.js`, `sprayLibrary.js`, `skinRecipes.js`, `callouts.js` | silah başına balistik/spray tabloları, 115 kaplamanın boya reçetesi, harita bölge isimleri |
+| Motor | `src/game/*`, `src/world/*` | oyuncu, bot, mermi fiziği, el bombaları, C4, ekonomi, tur akışı |
+| Arayüz | `src/ui/*` | menü, radar, satın alma, kaplama kasası, kariyer paneli |
+
+Tüm bu tablolar elle yazılmaz: `npm run gen` ile üretilir.
+
 ## Komutlar
 
 | Komut | Açıklama |
 | --- | --- |
 | `npm run dev` | geliştirme sunucusu |
+| `npm run gen` | harita + oyun verisini yeniden üretir |
+| `npm run check` | 7 doğrulama (DOM, varlık, harita, kaplama, arayüz, sahne) |
+| `npm run sim` | headless maç simülasyonu (botlar 5v5) |
 | `npm run build` | üretim paketi |
 | `npm run check` | veri + harita + kaplama + UI + sahne testleri |
 | `npm run maps` | radar'lardan haritaları yeniden üret |

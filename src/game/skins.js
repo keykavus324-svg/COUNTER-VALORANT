@@ -8,6 +8,7 @@
  */
 import * as THREE from 'three';
 import { WEAPON_SKINS, skinImageUrl, loadImage, cdnStatus } from './csgoAssets.js';
+import { SKIN_RECIPES } from '../data/skinRecipes.js';
 
 const textureCache = new Map();   // uuid -> THREE.Texture | null (failed)
 const pending = new Map();        // uuid -> Promise<THREE.Texture|null>
@@ -150,6 +151,18 @@ function paletteFromRarity(hex) {
 export function paletteFor(skinOrName) {
   const name = typeof skinOrName === 'string' ? skinOrName : skinOrName?.full || skinOrName?.name;
   const rarity = typeof skinOrName === 'object' ? skinOrName?.color : null;
+  const id = typeof skinOrName === 'object' ? skinOrName?.id : null;
+  const authored = id ? SKIN_RECIPES[id] : null;
+  if (authored) {
+    return {
+      body: authored.body,
+      accent: authored.accent,
+      trim: authored.trim,
+      family: authored.motif,
+      motif: authored.motif,
+      recipe: authored,
+    };
+  }
   if (!name) return DEFAULT_PALETTE;
   const hit = SKIN_PALETTES.find((p) => p.match.test(name));
   const base = hit || paletteFromRarity(rarity) || DEFAULT_PALETTE;
@@ -208,9 +221,14 @@ export function skinPatternTexture(skin) {
   const ctx = c.getContext?.('2d');
   if (!ctx) { patternCache.set(key, null); return null; }
 
-  const pal = paletteFor(skin.name);
-  const seed = skinSeed(skin.name);
-  const motif = seed % 6;
+  const pal = paletteFor(skin);
+  const seed = skinSeed(skin.full || skin.name);
+  const MOTIF_INDEX = {
+    hex: 0, racing: 1, flame: 2, glitch: 3, camo: 4, circuit: 0,
+    marble: 5, wave: 2, scatter: 4, grid: 1,
+  };
+  const recipe = SKIN_RECIPES[skin.id];
+  const motif = recipe ? (MOTIF_INDEX[recipe.motif] ?? seed % 6) : seed % 6;
 
   ctx.fillStyle = pal.body;
   ctx.fillRect(0, 0, size, size);

@@ -7,6 +7,7 @@ import { BUY_ORDER, BUY_GROUPS, WEAPONS, weaponIconSVG } from '../game/weapons.j
 import { WALLS, PROPS, SITES, SPAWNS, MAP_BOUNDS } from '../world/mapLayout.js';
 import { WeaponPreview } from './weaponPreview.js';
 import { skinFloat, wearLabel } from '../game/skins.js';
+import { calloutAt } from '../data/callouts.js';
 import { skinThumbnail } from './skinThumb.js';
 import { audio } from '../core/audio.js';
 import { profileSummary, loadProfile, resetProfile, statTrakCount } from '../game/profile.js';
@@ -91,7 +92,7 @@ export class UI {
       damageVignette: $('#damage-vignette'), flashOverlay: $('#flash-overlay'),
       buyWeapons: $('#buy-weapons'), buyGear: $('#buy-gear'), buyCredits: $('#buy-credits'),
       buySummary: $('#buy-summary'),
-      weaponStatTrak: $('#weapon-stattrak'),
+      weaponStatTrak: $('#weapon-stattrak'), hudLocation: $('#hud-location'),
       careerPanel: $('#career-panel'), careerBody: $('#career-body'), meCareer: $('#me-career'),
       sbAllies: $('#sb-allies'), sbEnemies: $('#sb-enemies'), sbScore: $('#sb-score'),
       agentGrid: $('#agent-grid'), adName: $('#ad-name'), adRole: $('#ad-role'), adDesc: $('#ad-desc'),
@@ -855,6 +856,21 @@ export class UI {
     if (this.minimapAcc > 0.05) {
       this.minimapAcc = 0;
       this.drawMinimap(game);
+    }
+
+    // CS callout under the vitals: "DUST II · MID"
+    if (this.el.hudLocation) {
+      this.locAcc = (this.locAcc || 0) + dt;
+      if (this.locAcc > 0.2) {
+        this.locAcc = 0;
+        const mapName = (CURRENT_MAP?.name || '').toUpperCase();
+        const area = calloutAt(CURRENT_MAP?.id, p.pos.x, p.pos.z) || 'BÖLGE';
+        const text = `${mapName} · ${area}`;
+        if (text !== this._lastLocation) {
+          this._lastLocation = text;
+          this.el.hudLocation.textContent = text;
+        }
+      }
     }
   }
 

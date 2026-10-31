@@ -729,3 +729,9 @@ input[type="checkbox"] { accent-color: var(--red); }
   background: rgba(255,255,255,.06); color: var(--muted);
 }
 .skin-meta span.st { background: rgba(255,140,60,.18); color: #ffb066; }
+
+/* current map area (CS callout) */
+.hud-location {
+  font-size: 9px; letter-spacing: .22em; color: var(--muted); text-transform: uppercase;
+  margin: 4px 0 2px; white-space: nowrap;
+}

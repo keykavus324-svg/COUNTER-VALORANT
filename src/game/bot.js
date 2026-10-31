@@ -80,7 +80,9 @@ export class Bot extends Actor {
     this.stuckTimer = 0;
     this.lastPos.copy(this.pos);
     this.deadEye = false;
-    this.route = route ? route.map((p) => ({ x: p[0], z: p[1] })) : null;
+    this.route = route
+      ? route.map((p) => (Array.isArray(p) ? { x: p[0], z: p[1] } : { x: p.x, z: p.z }))
+      : null;
     this.routeIndex = 0;
   }
 
@@ -184,8 +186,42 @@ export class Bot extends Actor {
     }
   }
 
+  /**
+   * Watchdog against corner traps: if we are trying to walk but barely move
+   * for a couple of seconds, sidestep for a moment so we slide out of the
+   * geometry instead of grinding into it for the rest of the round.
+   */
+  trackProgress(dt) {
+    if (!this._stuckWatch) this._stuckWatch = { pos: { x: this.pos.x, z: this.pos.z }, t: 0, escape: 0 };
+    const w = this._stuckWatch;
+    const moved = Math.hypot(this.pos.x - w.pos.x, this.pos.z - w.pos.z);
+    if (this.escapeTimer > 0) this.escapeTimer -= dt;
+    if (!this.wantMove || this.state === 'engage') {
+      w.t = 0;
+      w.pos.x = this.pos.x;
+      w.pos.z = this.pos.z;
+      return;
+    }
+    if (moved > 0.25) {
+      w.t = 0;
+      w.pos.x = this.pos.x;
+      w.pos.z = this.pos.z;
+      return;
+    }
+    w.t += dt;
+    if (w.t > 2.2) {
+      w.t = 0;
+      this.escapeTimer = 0.55;
+      this.escapeDir = Math.random() < 0.5 ? 1 : -1;
+      // drop the cached path so A* is asked again from the new position
+      this.path = null;
+      this.repathTimer = 0;
+    }
+  }
+
   /* -------------------------------------------------------------- */
   update(dt) {
+    this.trackProgress(dt);
     if (!this.alive) {
       this.character.alive = false;
       this.updateCommon(dt);
@@ -240,6 +276,17 @@ export class Bot extends Actor {
 
     // ---------- physics ----------
     let wish = new THREE.Vector3();
+    if (this.escapeTimer > 0 && this.moveTarget) {
+      // sidestep perpendicular to the blocked direction
+      const dx = this.moveTarget.x - this.pos.x;
+      const dz = this.moveTarget.z - this.pos.z;
+      const len = Math.hypot(dx, dz) || 1;
+      this.moveTarget = {
+        x: this.pos.x + (-dz / len) * this.escapeDir * 2.2,
+        z: this.pos.z + (dx / len) * this.escapeDir * 2.2,
+      };
+    }
+
     if (this.wantMove && this.moveTarget) {
       const dx = this.moveTarget.x - this.pos.x;
       const dz = this.moveTarget.z - this.pos.z;

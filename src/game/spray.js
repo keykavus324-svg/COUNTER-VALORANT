@@ -48,6 +48,9 @@ const HEAVY = [
 
 const SNIPER = [[0, 0.00], [0, 2.2], [0, 2.4]];
 
+import { BALLISTICS, inaccuracyAt } from '../data/ballistics.js';
+import { sprayKick } from '../data/sprayLibrary.js';
+
 const PATTERNS = {
   rifle: AK,
   m4: M4,
@@ -77,6 +80,8 @@ export function patternKind(weapon) {
  * @returns {{x:number,y:number}} horizontal / vertical kick
  */
 export function sprayOffset(weapon, shotIndex) {
+  const kick = sprayKick(weapon?.id, shotIndex | 0);
+  if (kick) return kick;
   const table = patternKind(weapon);
   const scale = weapon?.patternScale ?? 1;
   const i = Math.max(0, Math.min(table.length - 1, shotIndex | 0));
@@ -89,11 +94,13 @@ export function firstShotAccuracy(weapon, actor) {
   const speed = Math.hypot(actor?.vel?.x || 0, actor?.vel?.z || 0);
   if (!weapon) return 0;
   if (weapon.scope && actor?.adsAmount > 0.85) return 0;
-  const base = weapon.spread * 0.28;
-  const move = Math.min(speed / 5.4, 1) * (weapon.spread * 1.5);
-  const air = actor?.grounded === false ? weapon.spread * 1.8 : 0;
-  const crouch = actor?.crouch ? 0.6 : 1;
-  return (base + move + air) * crouch;
+  const state = actor?.grounded === false ? 'air'
+    : actor?.crouch ? 'crouch'
+      : speed > 4.2 ? 'run'
+        : speed > 1.2 ? 'walk' : 'stand';
+  const bucket = inaccuracyAt(weapon.id, state);
+  const extra = Math.min(speed / 5.4, 1) * weapon.spread * 0.9;
+  return bucket + extra;
 }
 
 /** Human readable pattern preview used by the buy menu tooltip. */

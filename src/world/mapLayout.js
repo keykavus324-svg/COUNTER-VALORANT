@@ -10,6 +10,7 @@
  * bots, UI, radar) always reads the currently selected arena.
  */
 import { decodeMask, buildWalls, buildNav, buildSpots, WALL_HEIGHT } from './gridLayout.js';
+import { bakedMap } from '../data/maps/index.js';
 
 import de_dust2 from './maps/de_dust2.js';
 import de_mirage from './maps/de_mirage.js';
@@ -72,6 +73,7 @@ export const SITES = {
 };
 export const SPAWNS = { attacker: [{ x: 0, z: 10 }], defender: [{ x: 0, z: -10 }] };
 export const NAV_NODES = [];
+export const NODE_SCORES = [];
 export const NAV_EDGES = [];
 export const PLANT_SPOTS = { A: [], B: [] };
 export const HOLD_SPOTS = { A: [], B: [], mid: [] };
@@ -83,6 +85,19 @@ let built = null;
 
 const reset = (arr) => { arr.length = 0; return arr; };
 
+/** Cover score of a spot, looked up from the baked per waypoint table. */
+function spotScore(baked, spot) {
+  if (!baked?.NODE_SCORES || !baked.NODES) return 0;
+  let best = 0;
+  let bd = Infinity;
+  for (let i = 0; i < baked.NODES.length; i++) {
+    const n = baked.NODES[i];
+    const d = (n[0] - spot.x) ** 2 + (n[1] - spot.z) ** 2;
+    if (d < bd) { bd = d; best = i; }
+  }
+  return baked.NODE_SCORES[best]?.[2] ?? 0;
+}
+
 /**
  * Build (once) and activate the layout of a real map.
  * Returns the ready-to-use arena description.
@@ -91,19 +106,58 @@ export function applyMap(mapId) {
   const map = MAP_BY_ID[mapId] || MAPS[0];
   CURRENT_MAP = map;
   if (!built || built.id !== map.id) {
-    const cells = decodeMask(map);
-    const walls = buildWalls(map, cells);
-    const { nodes, edges } = buildNav(map, cells);
-    const spots = buildSpots(map, cells, nodes, edges);
-    built = { id: map.id, walls, nodes, edges, spots, theme: THEMES[map.theme] || THEMES.sand };
+    const baked = bakedMap(map.id);
+    if (baked) {
+      // pre-baked at build time by tools/genmaps.mjs: no geometry work on load
+      const TAG_NAMES = ['map', 'A', 'B', 'mid', 'spawn'];
+      const nodes = baked.NODES.map(([x, z, t]) => ({ x, z, tag: TAG_NAMES[t] || 'map' }));
+      const edges = baked.EDGES.map((list) => list.map((to) => ({
+        to, cost: Math.hypot(nodes[to].x - 0, nodes[to].z - 0) || 1,
+      })));
+      // recompute edge costs from the actual node positions
+      for (let i = 0; i < edges.length; i++) {
+        for (const e of edges[i]) {
+          e.cost = Math.hypot(nodes[e.to].x - nodes[i].x, nodes[e.to].z - nodes[i].z);
+        }
+      }
+      const extra = { scores: baked.NODE_SCORES || [], props: baked.PROPS || [] };
+      // rank hold spots by how much cover they offer (baked score index 2)
+      const rank = (list) => list.slice().sort((a, b) => {
+        const sa = spotScore(baked, a);
+        const sb = spotScore(baked, b);
+        return sb - sa;
+      });
+      const spots = {
+        plantSpots: { A: baked.SPOTS.plant.A, B: baked.SPOTS.plant.B },
+        holdSpots: baked.SPOTS.hold,
+        attackPaths: {},
+      };
+      for (const key of ['A', 'B']) {
+        const routes = {};
+        for (const [lane, pts] of Object.entries(baked.SPOTS.paths?.[key] || {})) {
+          routes[lane] = pts;   // [x, z] pairs, as bot.resetForRound expects
+        }
+        spots.attackPaths[key] = routes;
+      }
+      built = { id: map.id, walls: baked.WALLS, nodes, edges, spots, theme: THEMES[map.theme] || THEMES.sand, ...extra };
+    } else {
+      const cells = decodeMask(map);
+      const walls = buildWalls(map, cells);
+      const { nodes, edges } = buildNav(map, cells);
+      const spots = buildSpots(map, cells, nodes, edges);
+      built = { id: map.id, walls, nodes, edges, spots, theme: THEMES[map.theme] || THEMES.sand };
+    }
   }
 
   reset(WALLS).push(...built.walls);
 
   reset(FLOORS).push([0, 0, 1, 1, 'ground']);
 
-  // cover crates around the bomb sites
+  // cover crates: baked placement first, then a few around the sites
   reset(PROPS);
+  if (built.props && built.props.length) {
+    PROPS.push(...built.props);
+  }
   for (const key of ['A', 'B']) {
     const site = map.sites[key];
     const spots = built.spots.plantSpots[key] || [];
@@ -126,6 +180,8 @@ export function applyMap(mapId) {
   reset(NAV_NODES);
   for (const n of built.nodes) NAV_NODES.push({ x: n.x, z: n.z, tag: n.tag });
   reset(NAV_EDGES).push(...built.edges);
+  reset(NODE_SCORES);
+  if (built.scores) NODE_SCORES.push(...built.scores);
 
   reset(PLANT_SPOTS.A).push(...(built.spots.plantSpots.A || []));
   reset(PLANT_SPOTS.B).push(...(built.spots.plantSpots.B || []));

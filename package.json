@@ -1,9 +1,9 @@
 {
-  "name": "counter-valorant",
+  "name": "counter-strike-browser-ops",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "COUNTER VALORANT — tarayıcıda çalışan, Valorant tarzı ajanlar ve CS tarzı taktik 5v5 spike modu (fan projesi)",
+  "description": "COUNTER-STRIKE: BROWSER OPS — gerçek CS2 radarlarından üretilmiş haritalar, CS:GO silah kaplamaları ve klasik defuse kurallarıyla tarayıcıda 5v5 taktik FPS (fan projesi)",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
@@ -11,7 +11,10 @@
     "check": "node tools/domcheck.mjs && node tools/assetcheck.mjs && node tools/mapcheck.mjs && node tools/skincheck.mjs && node tools/uicheck.mjs && node tools/scenecheck.mjs",
     "sim": "node tools/headless-sim.mjs",
     "test": "npm run check",
-    "maps": "node tools/buildmaps.mjs"
+    "maps": "node tools/buildmaps.mjs",
+    "genmaps": "node tools/genmaps.mjs",
+    "gendata": "node tools/gendata.mjs",
+    "gen": "node tools/genmaps.mjs && node tools/gendata.mjs"
   },
   "dependencies": {
     "three": "0.169.0"
