@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { decorateWeaponModel } from './skins.js';
+import { buildGunModel } from './gunModels.js';
 
 /**
  * Weapon catalogue + procedural low-poly weapon models.
@@ -267,213 +268,23 @@ function railSlots(mat, x, y, z, length, count = 5) {
  */
 export function buildWeaponModel(id, viewmodel = true, skinMap = null) {
   const g = new THREE.Group();
-  const w = getWeapon(id);
   const shape = WEAPON_SHAPE[id] || id;
+
+  const built = buildGunModel(shape, M);
+  built.root.position.set(0, 0, 0);
+  g.add(built.root);
+  g.userData.mag = built.mag || null;
+  g.userData.weaponId = id;
+  g.userData.shape = shape;
+
+  // muzzle / shell anchors are Object3D markers so gameplay code can query them
   const muzzle = new THREE.Object3D();
+  muzzle.position.copy(built.muzzle);
   const shellEject = new THREE.Object3D();
-  let magMesh = null;
-
-  switch (shape) {
-    case 'knife': {
-      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.16, 0.42), M.steel);
-      blade.position.set(0, 0.06, -0.34);
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.16, 4), M.steel);
-      tip.rotation.x = -Math.PI / 2;
-      tip.position.set(0, 0.1, -0.58);
-      const guard = box(0.1, 0.05, 0.06, M.metalDark, 0, 0, -0.09);
-      const handle = box(0.055, 0.075, 0.25, M.polymer, 0, 0, 0.05);
-      const wrap = box(0.062, 0.082, 0.06, M.accent, 0, 0, -0.01);
-      g.add(blade, tip, guard, handle, wrap);
-      muzzle.position.set(0, 0.1, -0.62);
-      break;
-    }
-    case 'classic': {
-      const slide = box(0.075, 0.085, 0.34, M.metal, 0, 0.045, -0.09);
-      const frame = box(0.07, 0.06, 0.24, M.polymer, 0, -0.01, -0.03);
-      const grip = box(0.075, 0.24, 0.12, M.polymer, 0, -0.14, 0.07, 0.28);
-      const barrel = cyl(0.02, 0.02, 0.12, M.metalDark, 0, 0.05, -0.28);
-      const sight = box(0.02, 0.025, 0.04, M.accent, 0, 0.1, -0.24);
-      const trigger = box(0.03, 0.05, 0.02, M.metalDark, 0, -0.04, 0.02);
-      magMesh = box(0.06, 0.09, 0.05, M.accentBlue, 0, -0.22, 0.09, 0.28);
-      const guard = triggerGuard(M.polymer, 0, -0.07, -0.02, 0.036);
-      g.add(slide, frame, grip, barrel, sight, trigger, magMesh, guard);
-      muzzle.position.set(0, 0.05, -0.35);
-      shellEject.position.set(0.05, 0.07, -0.06);
-      break;
-    }
-    case 'ghost': {
-      const slide = box(0.07, 0.09, 0.42, M.metal, 0, 0.05, -0.13);
-      const supp = cyl(0.033, 0.033, 0.22, M.metalDark, 0, 0.05, -0.4);
-      const grip = box(0.07, 0.25, 0.11, M.polymer, 0, -0.15, 0.07, 0.26);
-      const accent = box(0.074, 0.02, 0.16, M.accentBlue, 0, 0.05, -0.06);
-      const guard = box(0.055, 0.02, 0.1, M.metalDark, 0, -0.03, -0.02);
-      magMesh = box(0.055, 0.12, 0.05, M.metalDark, 0, -0.22, 0.09, 0.28);
-      const sight = box(0.02, 0.03, 0.03, M.steel, 0, 0.105, -0.3);
-      const triggerGuardMesh = triggerGuard(M.polymer, 0, -0.075, -0.01, 0.036);
-      g.add(slide, supp, grip, accent, guard, magMesh, sight, triggerGuardMesh);
-      muzzle.position.set(0, 0.05, -0.52);
-      shellEject.position.set(0.05, 0.08, -0.1);
-      break;
-    }
-    case 'sheriff': {
-      const barrel = cyl(0.028, 0.028, 0.34, M.metal, 0, 0.055, -0.24);
-      const frame = box(0.07, 0.08, 0.2, M.metal, 0, 0.03, -0.06);
-      const cylBody = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.12, 8), M.gold);
-      cylBody.rotation.z = Math.PI / 2;
-      cylBody.rotation.y = 0;
-      cylBody.position.set(0, 0.03, -0.1);
-      const grip = box(0.075, 0.26, 0.11, M.woodDark, 0, -0.15, 0.07, 0.24);
-      const hammer = box(0.03, 0.06, 0.04, M.metalDark, 0, 0.08, 0.06);
-      const sight = box(0.015, 0.025, 0.04, M.gold, 0, 0.1, -0.36);
-      g.add(barrel, frame, cylBody, grip, hammer, sight);
-      muzzle.position.set(0, 0.055, -0.42);
-      shellEject.position.set(0.05, 0.06, -0.06);
-      break;
-    }
-    case 'spectre': {
-      const body = box(0.09, 0.11, 0.42, M.polymer, 0, 0.02, -0.12);
-      const barrelShroud = cyl(0.035, 0.035, 0.2, M.metalDark, 0, 0.03, -0.4);
-      const stock = box(0.05, 0.08, 0.22, M.metalDark, 0, 0.02, 0.19);
-      const stockEnd = box(0.06, 0.14, 0.05, M.polymer, 0, -0.01, 0.31);
-      const grip = box(0.07, 0.2, 0.1, M.polymer, 0, -0.14, 0.02, 0.22);
-      magMesh = box(0.06, 0.2, 0.07, M.metalDark, 0, -0.14, -0.14, 0.1);
-      const rail = box(0.06, 0.03, 0.2, M.metal, 0, 0.085, -0.14);
-      const accent = box(0.095, 0.02, 0.1, M.accentBlue, 0, 0.02, 0.04);
-      const sight = box(0.04, 0.05, 0.05, M.metalDark, 0, 0.11, -0.1);
-      g.add(body, barrelShroud, stock, stockEnd, grip, magMesh, rail, accent, sight);
-      muzzle.position.set(0, 0.03, -0.52);
-      shellEject.position.set(0.055, 0.05, -0.06);
-      break;
-    }
-    case 'judge': {
-      const body = box(0.09, 0.1, 0.4, M.metal, 0, 0.02, -0.1);
-      const tube = cyl(0.03, 0.03, 0.36, M.metalDark, 0, 0.07, -0.32);
-      const pump = box(0.075, 0.07, 0.16, M.wood, 0, 0.0, -0.3);
-      const stock = box(0.06, 0.12, 0.3, M.wood, 0, -0.03, 0.22, 0.06);
-      const grip = box(0.07, 0.16, 0.09, M.woodDark, 0, -0.1, 0.02, 0.2);
-      const sight = box(0.02, 0.025, 0.03, M.steel, 0, 0.09, -0.4);
-      magMesh = box(0.05, 0.1, 0.06, M.metalDark, 0, -0.08, -0.14);
-      g.add(body, tube, pump, stock, grip, sight, magMesh);
-      muzzle.position.set(0, 0.05, -0.5);
-      shellEject.position.set(0.05, 0.05, 0.0);
-      break;
-    }
-    case 'bulldog': {
-      const body = box(0.085, 0.11, 0.46, M.polymer, 0, 0.01, -0.1);
-      const barrel = cyl(0.022, 0.022, 0.3, M.metalDark, 0, 0.035, -0.42);
-      const handguard = box(0.075, 0.08, 0.22, M.tan, 0, 0.01, -0.32);
-      const stock = box(0.055, 0.1, 0.3, M.tan, 0, -0.02, 0.22);
-      const grip = box(0.06, 0.18, 0.09, M.polymer, 0, -0.14, 0.03, 0.2);
-      magMesh = box(0.06, 0.22, 0.09, M.metalDark, 0, -0.14, -0.16, -0.08);
-      const rail = box(0.055, 0.035, 0.3, M.metal, 0, 0.075, -0.16);
-      const sight = box(0.04, 0.06, 0.06, M.metalDark, 0, 0.115, -0.12);
-      const accent = box(0.09, 0.02, 0.08, M.accentBlue, 0, 0.01, 0.06);
-      g.add(body, barrel, handguard, stock, grip, magMesh, rail, sight, accent);
-      muzzle.position.set(0, 0.035, -0.58);
-      shellEject.position.set(0.055, 0.06, -0.04);
-      break;
-    }
-    case 'vandal': {
-      const body = box(0.08, 0.1, 0.5, M.metalDark, 0, 0.02, -0.08);
-      const barrel = cyl(0.02, 0.02, 0.42, M.metal, 0, 0.04, -0.47);
-      const gasBlock = box(0.05, 0.07, 0.1, M.metal, 0, 0.06, -0.32);
-      const handguard = box(0.07, 0.08, 0.26, M.wood, 0, 0.0, -0.28);
-      const stock = box(0.055, 0.13, 0.32, M.wood, 0, -0.03, 0.25, 0.03);
-      const grip = box(0.06, 0.18, 0.09, M.woodDark, 0, -0.14, 0.04, 0.22);
-      magMesh = curvedMag(0.07, 0.1, 0.26, M.metalDark, 0, -0.14, -0.14, 0.9, 5);
-      const rail = box(0.05, 0.03, 0.2, M.metal, 0, 0.075, -0.12);
-      const slots = railSlots(M.metalDark, 0, 0.086, -0.12, 0.18, 4);
-      const sight = box(0.035, 0.05, 0.05, M.metalDark, 0, 0.11, -0.1);
-      const accent = box(0.085, 0.025, 0.1, M.accent, 0, 0.02, 0.1);
-      const guard = triggerGuard(M.metal, 0, -0.085, 0.02, 0.05);
-      const gasTube = cyl(0.012, 0.012, 0.26, M.metal, 0, 0.078, -0.42);
-      const bolt = box(0.03, 0.03, 0.02, M.metal, 0.05, 0.03, -0.02);
-      g.add(body, barrel, gasBlock, handguard, stock, grip, magMesh, rail, slots, sight, accent, guard, gasTube, bolt);
-      muzzle.position.set(0, 0.04, -0.7);
-      shellEject.position.set(0.055, 0.06, -0.02);
-      break;
-    }
-    case 'phantom': {
-      const body = box(0.08, 0.11, 0.5, M.polymer, 0, 0.02, -0.06);
-      const supp = cyl(0.032, 0.032, 0.3, M.metalDark, 0, 0.045, -0.5);
-      const handguard = box(0.075, 0.085, 0.3, M.polymer, 0, 0.015, -0.3);
-      const stock = box(0.055, 0.12, 0.34, M.polymer, 0, -0.02, 0.26);
-      const grip = box(0.06, 0.18, 0.09, M.polymer, 0, -0.14, 0.05, 0.2);
-      magMesh = curvedMag(0.06, 0.09, 0.23, M.metalDark, 0, -0.13, -0.13, 0.32, 4);
-      const rail = box(0.05, 0.035, 0.34, M.metal, 0, 0.08, -0.14);
-      const slots = railSlots(M.metalDark, 0, 0.1, -0.14, 0.3, 6);
-      const sight = box(0.04, 0.055, 0.09, M.metalDark, 0, 0.12, -0.08);
-      const accent = box(0.085, 0.025, 0.12, M.accentBlue, 0, 0.02, 0.08);
-      const guard = triggerGuard(M.metal, 0, -0.085, 0.02, 0.05);
-      const charge = box(0.05, 0.02, 0.06, M.metal, 0, 0.055, 0.16);
-      const fwdAssist = cyl(0.012, 0.012, 0.06, M.metalDark, 0.045, 0.055, -0.02);
-      g.add(body, supp, handguard, stock, grip, magMesh, rail, slots, sight, accent, guard, charge, fwdAssist);
-      muzzle.position.set(0, 0.045, -0.68);
-      shellEject.position.set(0.055, 0.06, -0.02);
-      break;
-    }
-    case 'operator': {
-      const body = box(0.085, 0.12, 0.5, M.metalDark, 0, 0.02, -0.05);
-      const barrel = cyl(0.021, 0.021, 0.7, M.metal, 0, 0.045, -0.6);
-      const muzzleBrake = cyl(0.036, 0.032, 0.1, M.metalDark, 0, 0.045, -0.95);
-      const scopeBody = cyl(0.045, 0.045, 0.34, M.metalDark, 0, 0.155, -0.1, Math.PI / 2, 16);
-      const lens = cyl(0.05, 0.05, 0.02, M.glass, 0, 0.155, -0.28, Math.PI / 2, 16);
-      const lens2 = cyl(0.05, 0.05, 0.02, M.glass, 0, 0.155, 0.075, Math.PI / 2, 16);
-      const scopeMount = box(0.04, 0.08, 0.06, M.metal, 0, 0.1, -0.04);
-      const stock = box(0.06, 0.16, 0.36, M.polymer, 0, -0.02, 0.3);
-      const cheek = box(0.055, 0.06, 0.2, M.polymer, 0, 0.06, 0.24);
-      const grip = box(0.06, 0.19, 0.1, M.polymer, 0, -0.14, 0.06, 0.22);
-      magMesh = box(0.065, 0.18, 0.11, M.metalDark, 0, -0.12, -0.12);
-      const turretTop = cyl(0.026, 0.026, 0.03, M.metal, 0, 0.196, -0.08, 0, 12);
-      const turretSide = cyl(0.024, 0.024, 0.03, M.metal, 0.05, 0.155, -0.08, 0, 12);
-      turretSide.rotation.z = Math.PI / 2;
-      turretSide.rotation.x = 0;
-      const boltHandle = cyl(0.011, 0.011, 0.09, M.metal, 0.06, 0.04, 0.02, 0, 8);
-      boltHandle.rotation.z = 0.9;
-      boltHandle.rotation.x = 0;
-      const boltKnob = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 6), M.metalDark);
-      boltKnob.position.set(0.095, 0.075, 0.02);
-      const guard = triggerGuard(M.metal, 0, -0.075, 0.03, 0.05);
-      const bipodL = box(0.02, 0.22, 0.02, M.metal, -0.08, -0.16, -0.72, 0, 0, 0.3);
-      const bipodR = box(0.02, 0.22, 0.02, M.metal, 0.08, -0.16, -0.72, 0, 0, -0.3);
-      const accent = box(0.09, 0.025, 0.14, M.accent, 0, 0.02, 0.14);
-      g.add(body, barrel, muzzleBrake, scopeBody, lens, lens2, scopeMount, stock, cheek, grip, magMesh,
-        turretTop, turretSide, boltHandle, boltKnob, guard, bipodL, bipodR, accent);
-      muzzle.position.set(0, 0.045, -1.0);
-      shellEject.position.set(0.055, 0.06, 0.0);
-      break;
-    }
-    case 'odin': {
-      const body = box(0.11, 0.13, 0.52, M.metalDark, 0, 0.02, -0.06);
-      const drum = cyl(0.13, 0.13, 0.12, M.metal, 0, -0.06, -0.1, Math.PI / 2, 16);
-      const barrel = cyl(0.024, 0.024, 0.44, M.metal, 0, 0.04, -0.5);
-      const barrels = new THREE.Group();
-      for (let i = 0; i < 3; i++) {
-        const b = cyl(0.016, 0.016, 0.36, M.metalDark, Math.cos(i * 2.1) * 0.04, 0.04, -0.52);
-        barrels.add(b);
-      }
-      const stock = box(0.06, 0.14, 0.34, M.polymer, 0, -0.02, 0.3);
-      const grip = box(0.06, 0.18, 0.1, M.polymer, 0, -0.15, 0.06, 0.2);
-      const carry = box(0.04, 0.04, 0.3, M.metal, 0, 0.11, -0.2);
-      const accent = box(0.115, 0.025, 0.16, M.accent, 0, 0.02, 0.12);
-      g.add(body, drum, barrel, barrels, stock, grip, carry, accent);
-      muzzle.position.set(0, 0.04, -0.72);
-      shellEject.position.set(0.06, 0.06, -0.02);
-      break;
-    }
-    default: {
-      g.add(box(0.08, 0.1, 0.4, M.metal, 0, 0.03, -0.1));
-      muzzle.position.set(0, 0.03, -0.3);
-    }
-  }
-
-  // muzzle flash / shell anchors live in the gun so they follow every animation
-  muzzle.position.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0);
+  shellEject.position.copy(built.eject);
   g.add(muzzle, shellEject);
   g.userData.muzzle = muzzle;
   g.userData.shellEject = shellEject;
-  g.userData.mag = magMesh;
-  g.userData.weaponId = id;
 
   if (viewmodel) {
     g.scale.setScalar(0.92);
@@ -481,7 +292,6 @@ export function buildWeaponModel(id, viewmodel = true, skinMap = null) {
       if (o.isMesh) {
         o.castShadow = false;
         o.receiveShadow = false;
-        o.material = o.material;
         o.frustumCulled = false;
         o.renderOrder = 5;
       }

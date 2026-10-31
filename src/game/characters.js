@@ -20,7 +20,7 @@ const sharedGeo = {
   torso: scaled(capsule(0.225, 0.32, 6, 16), 1.0, 1.0, 0.66),
   chest: scaled(capsule(0.205, 0.24, 5, 14), 1.0, 1.0, 0.78),
   hips: scaled(capsule(0.2, 0.1, 4, 12), 1.0, 1.0, 0.74),
-  head: scaled(new THREE.SphereGeometry(0.105, 16, 12), 0.94, 1.14, 1.0),
+  head: scaled(new THREE.SphereGeometry(0.115, 16, 12), 0.94, 1.12, 1.0),
   helmet: new THREE.SphereGeometry(0.126, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.52),
   helmetRim: new THREE.TorusGeometry(0.118, 0.016, 6, 20),
   mask: scaled(new THREE.SphereGeometry(0.1, 14, 10, 0, Math.PI * 2, Math.PI * 0.42, Math.PI * 0.34), 1.0, 1.0, 1.02),
@@ -46,6 +46,107 @@ function mat(color, opts = {}) {
 }
 
 export class Character {
+  /**
+   * Two-bone IK for a shoulder→elbow→hand chain.
+   *
+   * Hand-tuning Euler angles per weapon always ended up with the arms splayed
+   * out like wings, because the pose has to satisfy a reach constraint. This
+   * solves the elbow angle for a target instead, so any weapon can specify
+   * where the hands go and the arms follow correctly.
+   */
+  _poseArm(side, target, roll = 0) {
+    const arm = side > 0 ? this.armR : this.armL;
+    const elbow = side > 0 ? this.elbowR : this.elbowL;
+    if (!arm || !elbow) return;
+    const L1 = 0.34;          // shoulder → elbow
+    const L2 = 0.34;          // elbow → hand
+    const shoulder = arm.position;
+    const toTarget = new THREE.Vector3().subVectors(target, shoulder);
+    let d = toTarget.length();
+    const min = Math.abs(L1 - L2) + 0.02;
+    const max = L1 + L2 - 0.01;
+    d = clamp(d, min, max);
+    const dir = toTarget.normalize();
+    // bend plane: elbows swing outwards and down, away from the chest
+    const hint = new THREE.Vector3(side * 0.85, -0.5, -0.15).normalize();
+    const axis = new THREE.Vector3().crossVectors(dir, hint);
+    if (axis.lengthSq() < 1e-5) axis.set(0, 1, 0);
+    axis.normalize();
+    const cosElbow = (L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2);
+    const elbowAngle = Math.PI - Math.acos(clamp(cosElbow, -1, 1));
+    // the arm group's local -Y is the limb; aim it at the target…
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir);
+    // …then roll the whole chain so the bend points outwards
+    const rollQ = new THREE.Quaternion().setFromAxisAngle(dir, roll);
+    arm.quaternion.copy(rollQ.multiply(q));
+    // …and bend the elbow by the solved interior angle
+    elbow.rotation.set(elbowAngle, 0, 0);
+    this._armIK = true;
+  }
+
+  /**
+   * Solve both arms so the palms sit on the gun: right hand on the pistol grip,
+   * left hand on the handguard (or supporting the pistol grip hand).
+   */
+  _poseHandsOnWeapon(weaponId) {
+    const w = getWeapon(weaponId);
+    const melee = w.type === 'MELEE';
+    const pistol = w.type === 'TABANCALAR';
+    const model = this.weaponModel;
+    if (!model) return;
+    this.root.updateWorldMatrix(true, true);
+    model.updateWorldMatrix(true, true);
+
+    // anchors in the gun's own space (see gunModels.js), scaled by the model
+    const scale = model.getWorldScale(new THREE.Vector3()).x;
+    const gripLocal = new THREE.Vector3(0, -0.055, -0.02);
+    const foreLocal = new THREE.Vector3(0, 0.0, melee ? -0.05 : pistol ? -0.02 : -0.3);
+    const toUpper = (v) => {
+      const world = model.localToWorld(v.clone().multiplyScalar(scale / (model.scale.x || 1)));
+      return this.upper.worldToLocal(world);
+    };
+    const grip = toUpper(gripLocal);
+    const fore = toUpper(foreLocal);
+    // supporting hand: on the handguard for long guns, cupping for pistols
+    const leftTarget = pistol
+      ? fore.clone().add(new THREE.Vector3(-0.055, -0.03, 0.02))
+      : fore.clone().add(new THREE.Vector3(-0.03, -0.045, 0.02));
+
+    this._poseArm(1, grip, melee ? 0.4 : 0.9);
+    if (melee) {
+      this.armL.visible = false;
+    } else {
+      this.armL.visible = true;
+      this._poseArm(-1, leftTarget, -0.9);
+    }
+  }
+
+  /** Where the hands should be for the current weapon, in upper-body space. */
+  _handTargets(weaponId) {
+    const w = getWeapon(weaponId);
+    const melee = w.type === 'MELEE';
+    if (melee) {
+      return {
+        right: new THREE.Vector3(0.1, 0.16, 0.34),
+        left: new THREE.Vector3(-0.05, 0.02, 0.2),
+        rollR: 0.5, rollL: -0.4,
+      };
+    }
+    const pistol = w.type === 'TABANCALAR' || w.type === 'YAKIN DÖVÜŞ';
+    if (pistol) {
+      return {
+        right: new THREE.Vector3(0.06, 0.16, 0.4),
+        left: new THREE.Vector3(-0.04, 0.12, 0.36),
+        rollR: 0.75, rollL: -0.75,
+      };
+    }
+    return {
+      right: new THREE.Vector3(0.08, 0.14, 0.3),
+      left: new THREE.Vector3(-0.02, 0.18, 0.52),
+      rollR: 0.85, rollL: -0.85,
+    };
+  }
+
   constructor({ agentId = 'phoenix', team = 'ally', name = 'BOT', isPlayer = false }) {
     this.agentId = agentId;
     this.agent = AGENTS[agentId] || AGENTS.phoenix;
@@ -99,7 +200,7 @@ export class Character {
 
     // ---- legs ----
     const legR = new THREE.Group();
-    legR.position.set(0.115, 0.88, 0);
+    legR.position.set(0.135, 0.88, 0);
     const thighR = new THREE.Mesh(sharedGeo.thigh, this.fabricMat);
     thighR.position.y = -0.22;
     const shinR = new THREE.Mesh(sharedGeo.shin, this.fabricMat);
@@ -111,7 +212,7 @@ export class Character {
     kneeR.scale.set(1, 0.9, 0.75);
     legR.add(thighR, shinR, bootR, kneeR);
     const legL = legR.clone();
-    legL.position.x = -0.115;
+    legL.position.x = -0.135;
     root.add(legR, legL);
     this.legR = legR;
     this.legL = legL;
@@ -242,8 +343,8 @@ export class Character {
 
     // ---- weapon holder ----
     const weaponMount = new THREE.Group();
-    weaponMount.position.set(0.05, 0.44, -0.3);
-    weaponMount.rotation.y = -0.12;
+    weaponMount.position.set(-0.02, 0.42, 0.26);
+    weaponMount.rotation.y = Math.PI - 0.1;
     weaponMount.rotation.set(0, 0, 0);
     this.weaponMount = weaponMount;
     upper.add(weaponMount);
@@ -318,24 +419,14 @@ export class Character {
     const model = buildWeaponModel(id, false, skinMap);
     model.rotation.set(0, 0, 0);
     model.position.set(0, 0, 0);
-    model.scale.setScalar(0.95);
+    model.scale.setScalar(0.78);
     this.weaponModel = model;
     this.muzzle = model.userData.muzzle;
     this.weaponMount.add(model);
-    // arms hold the gun
-    const w = getWeapon(id);
-    if (w.type === 'MELEE') {
-      this.armR.rotation.set(-0.9, 0, -0.2);
-      this.armL.rotation.set(-0.3, 0, 0.3);
-    } else {
-      // right hand on the grip, left hand out on the handguard: the elbows do
-      // the work instead of the shoulders, which is what makes it read as a
-      // two-handed rifle carry rather than a T-pose with a prop in front
-      this.armR.rotation.set(-0.95, -0.45, -0.42);
-      this.armL.rotation.set(-1.15, 0.5, 0.62);
-    }
-    this.elbowR.rotation.set(1.5, 0, 0.3);
-    this.elbowL.rotation.set(1.25, 0.1, -0.25);
+    // arms hold the gun: solve IK towards the weapon's *actual* grip and
+    // handguard anchors, converted into upper-body space, so the hands always
+    // land on the model no matter how the gun is authored or scaled.
+    this._poseHandsOnWeapon(id);
   }
 
   /** world-space muzzle position */
@@ -385,8 +476,9 @@ export class Character {
       this.legL.rotation.x = -Math.sin(this.walkPhase) * 0.62 * swing;
     }
 
-    this.armR.rotation.x = -0.95 + Math.sin(this.walkPhase) * 0.04 * swing;
-    this.armL.rotation.x = -1.15 + Math.sin(this.walkPhase + 1) * 0.035 * swing;
+    // a subtle sway on top of the IK pose: rotate the shoulder groups a hair
+    this.armR.rotateZ(Math.sin(this.walkPhase) * 0.03 * swing);
+    this.armL.rotateZ(Math.sin(this.walkPhase + 1) * 0.025 * swing);
     // aim pitch
     this.upper.rotation.x = clamp(-this.pitch * 0.55, -0.55, 0.55);
 

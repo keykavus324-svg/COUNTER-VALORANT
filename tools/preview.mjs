@@ -65,8 +65,9 @@ if (SUBJECT.startsWith('weapon:')) {
 } else if (SUBJECT.startsWith('actor:')) {
   const { Character } = await import('../src/game/characters.js');
   const ch = new Character({ agentId: SUBJECT.slice(6), team: 'ally', name: 'TEST' });
+  ch.setWeapon(process.env.PREVIEW_GUN || 'ak47');
   ch.root.position.set(0, 0, 0);
-  ch.root.rotation.y = Math.PI * 0.85;
+  ch.root.rotation.y = Number(process.env.PREVIEW_YAW || -1.05);
   scene.add(ch.root);
   subjectBounds = new THREE.Box3().setFromObject(ch.root);
 }
@@ -106,9 +107,20 @@ if (subjectBounds) {
   const centre = subjectBounds.getCenter(new THREE.Vector3());
   const size = subjectBounds.getSize(new THREE.Vector3());
   const dist = Math.max(size.x, size.y, size.z) * 1.9 + 0.6;
-  camera.position.set(centre.x + dist * 0.5, centre.y + dist * 0.35, centre.z + dist * 0.85);
-  camera.lookAt(centre);
-  camera.fov = 34;
+  if (process.env.PREVIEW_VIEW === 'side') {
+    // straight profile shot, left side, slightly elevated: the silhouette view
+    camera.position.set(centre.x - dist * 1.15, centre.y + dist * 0.12, centre.z);
+    camera.lookAt(centre);
+    camera.fov = 26;
+  } else if (process.env.PREVIEW_VIEW === 'front') {
+    camera.position.set(centre.x + dist * 0.02, centre.y + dist * 0.1, centre.z - dist);
+    camera.lookAt(centre);
+    camera.fov = 30;
+  } else {
+    camera.position.set(centre.x + dist * 0.5, centre.y + dist * 0.3, centre.z + dist * 0.85);
+    camera.lookAt(centre);
+    camera.fov = 34;
+  }
   camera.updateProjectionMatrix();
 } else if (mode === 'top') {
   const span = Math.max(MAP_BOUNDS.maxX - MAP_BOUNDS.minX, MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ);

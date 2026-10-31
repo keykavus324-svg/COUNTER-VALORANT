@@ -41,7 +41,9 @@ for (const id of Object.keys(WEAPON_SKINS)) {
   skinned.updateMatrixWorld(true);
   const hull = new THREE.Box3().setFromObject(skinned);
   skinned.scale.copy(s0);
-  const hullHalf = hull.getSize(new THREE.Vector3()).x / 2;
+  // the decal must sit just outside the +X flank of the hull, measured from
+  // the hull's own surface (models are not always centred on x = 0)
+  const hullMaxX = hull.max.x;
 
   const ok = applySkinDecal(skinned, { id: 'x', name: 'AK-47 | Redline' }, { texture: fakeTex });
   let decalOk = ok;
@@ -49,8 +51,8 @@ for (const id of Object.keys(WEAPON_SKINS)) {
     const art = skinned.userData.cvSkinDecal[0];
     const flank = art.children[0];
     // just proud of the hull, but not floating a hand away from it
-    decalOk = ok && Math.abs(flank.position.x) >= hullHalf * 0.98
-      && Math.abs(flank.position.x) <= hullHalf * 1.25 + 0.02;
+    decalOk = ok && flank.position.x >= hullMaxX * 0.99
+      && flank.position.x <= hullMaxX + 0.08;
   }
   const changed = maps.length > 0
     || colours.size !== baseColours.size

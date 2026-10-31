@@ -230,15 +230,29 @@ export class Viewmodel {
     this.equipOffset = 0.32;
     this.isMelee = w.type === 'MELEE';
 
-    // move the hands to the gun
+    // Move the hands onto the *modelled* gun: the right hand wraps the grip,
+    // the left one reaches the handguard. Positions follow the real grip and
+    // handguard coordinates of gunModels.js instead of a guessed offset.
     if (this.isMelee) {
-      this.rArm.position.set(0.22, -0.34, -0.18);
+      this.rArm.visible = true;
       this.lArm.visible = false;
+      this.rArm.position.set(0.19, -0.34, -0.2);
+      this.rArm.rotation.set(0.35, -0.5, 0.35);
     } else {
+      const pistol = /glock|usp_s|p250|deagle/.test(id);
       this.rArm.visible = true;
       this.lArm.visible = true;
-      this.rArm.position.set(0.25, -0.3, -0.25);
-      this.lArm.position.set(-0.16, -0.32, -0.3);
+      if (pistol) {
+        this.rArm.position.set(0.2, -0.3, -0.26);
+        this.rArm.rotation.set(0.1, -0.35, 0.15);
+        this.lArm.position.set(-0.06, -0.26, -0.3);
+        this.lArm.rotation.set(0.35, 0.75, -0.5);
+      } else {
+        this.rArm.position.set(0.2, -0.3, -0.24);
+        this.rArm.rotation.set(0.05, -0.42, 0.12);
+        this.lArm.position.set(-0.1, -0.26, -0.52);
+        this.lArm.rotation.set(0.12, 0.95, -0.22);
+      }
     }
   }
 
