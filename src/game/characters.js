@@ -1,0 +1,394 @@
+import * as THREE from 'three';
+import { AGENTS } from './agents.js';
+import { buildWeaponModel, getWeapon } from './weapons.js';
+import { clamp, damp } from '../core/utils.js';
+
+/**
+ * Third-person agent models: low-poly tactical operators with procedural
+ * walk / aim / death animation. Used for bots and for the player's avatar.
+ */
+
+const sharedGeo = {
+  torso: new THREE.BoxGeometry(0.5, 0.62, 0.3),
+  chest: new THREE.BoxGeometry(0.44, 0.34, 0.33),
+  hips: new THREE.BoxGeometry(0.42, 0.24, 0.28),
+  head: new THREE.BoxGeometry(0.24, 0.26, 0.24),
+  helmet: new THREE.SphereGeometry(0.16, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62),
+  visor: new THREE.BoxGeometry(0.24, 0.075, 0.06),
+  neck: new THREE.CylinderGeometry(0.07, 0.08, 0.1, 8),
+  upperArm: new THREE.BoxGeometry(0.13, 0.34, 0.14),
+  lowerArm: new THREE.BoxGeometry(0.115, 0.32, 0.12),
+  hand: new THREE.BoxGeometry(0.1, 0.11, 0.1),
+  thigh: new THREE.BoxGeometry(0.17, 0.44, 0.19),
+  shin: new THREE.BoxGeometry(0.145, 0.42, 0.165),
+  boot: new THREE.BoxGeometry(0.16, 0.12, 0.28),
+  rig: new THREE.BoxGeometry(0.46, 0.3, 0.35),
+  pad: new THREE.BoxGeometry(0.18, 0.12, 0.2),
+  pack: new THREE.BoxGeometry(0.32, 0.34, 0.18),
+};
+
+function mat(color, opts = {}) {
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.08, ...opts });
+}
+
+export class Character {
+  constructor({ agentId = 'blaze', team = 'ally', name = 'BOT', isPlayer = false }) {
+    this.agentId = agentId;
+    this.agent = AGENTS[agentId] || AGENTS.blaze;
+    this.team = team;
+    this.name = name;
+    this.isPlayer = isPlayer;
+
+    this.pos = new THREE.Vector3();
+    this.vel = new THREE.Vector3();
+    this.yaw = 0;
+    this.pitch = 0;
+    this.health = 100;
+    this.armor = 0;
+    this.alive = true;
+    this.revealed = 0;
+    this.walkPhase = Math.random() * 10;
+    this.crouch = 0;
+    this.deathTime = 0;
+    this.hitFlash = 0;
+    this.isBot = !isPlayer;
+
+    this._build();
+
+    // collision / hit boxes (world space, refreshed every frame)
+    this.hitBoxes = { head: null, body: null, legs: null };
+  }
+
+  _build() {
+    const c = this.agent.colors;
+    const teamColor = this.team === 'ally' ? 0x35e8c0 : 0xff4655;
+    this.teamColor = teamColor;
+
+    const skin = mat(0xc9926f, { roughness: 0.85 });
+    this.fabricMat = mat(new THREE.Color(c.fabric), { roughness: 0.9 });
+    const primaryMat = mat(new THREE.Color(c.primary), { roughness: 0.55, metalness: 0.25 });
+    const secondaryMat = mat(new THREE.Color(c.secondary), { roughness: 0.5, metalness: 0.3 });
+    this.darkMat = mat(new THREE.Color(c.dark), { roughness: 0.8 });
+    const gearMat = mat(0x2a3138, { roughness: 0.85 });
+    this.armorMat = mat(0x3a4249, { roughness: 0.6, metalness: 0.25 });
+    this.glowMat = new THREE.MeshStandardMaterial({
+      color: teamColor, emissive: teamColor, emissiveIntensity: 1.6, roughness: 0.3,
+    });
+    this.mats = [skin, this.fabricMat, primaryMat, secondaryMat, this.darkMat, gearMat, this.armorMat];
+
+    const root = new THREE.Group();
+    this.root = root;
+
+    // ---- legs ----
+    const legR = new THREE.Group();
+    legR.position.set(0.115, 0.88, 0);
+    const thighR = new THREE.Mesh(sharedGeo.thigh, this.fabricMat);
+    thighR.position.y = -0.22;
+    const shinR = new THREE.Mesh(sharedGeo.shin, this.fabricMat);
+    shinR.position.y = -0.62;
+    const bootR = new THREE.Mesh(sharedGeo.boot, gearMat);
+    bootR.position.set(0, -0.84, 0.05);
+    legR.add(thighR, shinR, bootR);
+    const legL = legR.clone();
+    legL.position.x = -0.115;
+    root.add(legR, legL);
+    this.legR = legR;
+    this.legL = legL;
+
+    // ---- torso ----
+    const upper = new THREE.Group();
+    upper.position.set(0, 0.9, 0);
+    this.upper = upper;
+    const hips = new THREE.Mesh(sharedGeo.hips, this.fabricMat);
+    hips.position.y = 0.02;
+    const torso = new THREE.Mesh(sharedGeo.torso, this.fabricMat);
+    torso.position.y = 0.36;
+    const chest = new THREE.Mesh(sharedGeo.chest, this.armorMat);
+    chest.position.y = 0.43;
+    const rig = new THREE.Mesh(sharedGeo.rig, gearMat);
+    rig.position.set(0, 0.4, 0.03);
+    rig.scale.set(1.02, 0.9, 0.9);
+    const pack = new THREE.Mesh(sharedGeo.pack, this.darkMat);
+    pack.position.set(0, 0.42, -0.23);
+    const collar = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.1, 0.26), primaryMat);
+    collar.position.y = 0.68;
+    const teamStripe = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.24, 0.02), this.glowMat);
+    teamStripe.position.set(0.12, 0.46, 0.19);
+    const shoulderPadL = new THREE.Mesh(sharedGeo.pad, primaryMat);
+    shoulderPadL.position.set(-0.3, 0.6, 0);
+    shoulderPadL.rotation.z = 0.2;
+    const shoulderPadR = shoulderPadL.clone();
+    shoulderPadR.position.x = 0.3;
+    shoulderPadR.rotation.z = -0.2;
+    upper.add(hips, torso, chest, rig, pack, collar, teamStripe, shoulderPadL, shoulderPadR);
+
+    // ---- head ----
+    const headGroup = new THREE.Group();
+    headGroup.position.y = 0.92;
+    this.headGroup = headGroup;
+    const neck = new THREE.Mesh(sharedGeo.neck, skin);
+    neck.position.y = -0.03;
+    const head = new THREE.Mesh(sharedGeo.head, skin);
+    head.position.y = 0.12;
+    const helmet = new THREE.Mesh(sharedGeo.helmet, primaryMat);
+    helmet.position.y = 0.16;
+    helmet.scale.set(1.16, 1.05, 1.18);
+    const visor = new THREE.Mesh(sharedGeo.visor, this.glowMat);
+    visor.position.set(0, 0.13, 0.115);
+    const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.09, 0.2), this.darkMat);
+    jaw.position.set(0, 0.04, 0.02);
+    headGroup.add(neck, head, helmet, visor, jaw);
+    // agent accents
+    if (this.agentId === 'blaze') {
+      const fin = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 4), secondaryMat);
+      fin.position.set(0, 0.27, -0.02);
+      headGroup.add(fin);
+    } else if (this.agentId === 'veil') {
+      const hood = new THREE.Mesh(new THREE.SphereGeometry(0.21, 10, 8), this.fabricMat);
+      hood.scale.set(1, 1.05, 1.1);
+      hood.position.y = 0.14;
+      const face = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.15, 0.04), this.glowMat);
+      face.position.set(0, 0.12, 0.15);
+      hood.add(face);
+      headGroup.add(hood);
+    } else if (this.agentId === 'pulse') {
+      const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.28, 5), secondaryMat);
+      antenna.position.set(0.12, 0.34, 0);
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), this.glowMat);
+      tip.position.set(0.12, 0.48, 0);
+      headGroup.add(antenna, tip);
+    } else if (this.agentId === 'oath') {
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.016, 6, 20), secondaryMat);
+      halo.rotation.x = Math.PI / 2;
+      halo.position.y = 0.3;
+      headGroup.add(halo);
+    }
+    upper.add(headGroup);
+
+    // ---- arms ----
+    const makeArm = (side) => {
+      const arm = new THREE.Group();
+      arm.position.set(0.3 * side, 0.62, 0);
+      const upperArm = new THREE.Mesh(sharedGeo.upperArm, this.fabricMat);
+      upperArm.position.y = -0.17;
+      const elbow = new THREE.Group();
+      elbow.position.y = -0.34;
+      const lowerArm = new THREE.Mesh(sharedGeo.lowerArm, this.fabricMat);
+      lowerArm.position.y = -0.16;
+      const hand = new THREE.Mesh(sharedGeo.hand, this.darkMat);
+      hand.position.y = -0.34;
+      elbow.add(lowerArm, hand);
+      arm.add(upperArm, elbow);
+      return { arm, elbow, hand };
+    };
+    const R = makeArm(1);
+    const L = makeArm(-1);
+    this.armR = R.arm;
+    this.armL = L.arm;
+    this.elbowR = R.elbow;
+    this.elbowL = L.elbow;
+    upper.add(R.arm, L.arm);
+
+    // ---- weapon holder ----
+    const weaponMount = new THREE.Group();
+    weaponMount.position.set(0.16, 0.5, -0.16);
+    weaponMount.rotation.set(0, 0, 0);
+    this.weaponMount = weaponMount;
+    upper.add(weaponMount);
+
+    root.traverse((o) => {
+      if (o.isMesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+      }
+    });
+    this.setWeapon('classic');
+
+    // ---- name tag ----
+    this._buildNameTag();
+  }
+
+  _buildNameTag() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    this.tagCanvas = canvas;
+    this.tagCtx = canvas.getContext('2d');
+    this.tagTexture = new THREE.CanvasTexture(canvas);
+    this.tagTexture.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.SpriteMaterial({
+      map: this.tagTexture, transparent: true, depthTest: false, depthWrite: false, opacity: 0.95,
+    });
+    this.tag = new THREE.Sprite(mat);
+    this.tag.scale.set(1.5, 0.375, 1);
+    this.tag.position.y = 2.15;
+    this.tag.renderOrder = 20;
+    this.tag.visible = false;
+    this.root.add(this.tag);
+    this._lastTagKey = '';
+    this._drawTag();
+  }
+
+  _drawTag() {
+    const key = `${Math.ceil(this.health)}-${this.team}-${this.revealed > 0}`;
+    if (key === this._lastTagKey) return;
+    this._lastTagKey = key;
+    const ctx = this.tagCtx;
+    ctx.clearRect(0, 0, 256, 64);
+    ctx.font = 'bold 22px Arial Narrow, Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = this.team === 'ally' ? '#8ff5dd' : '#ff8b95';
+    ctx.shadowColor = 'rgba(0,0,0,.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillText(this.name.toUpperCase(), 128, 26);
+    // health bar
+    const w = 150;
+    const h = 8;
+    const x = (256 - w) / 2;
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(0,0,0,.65)';
+    ctx.fillRect(x - 2, 36, w + 4, h + 4);
+    ctx.fillStyle = this.team === 'ally' ? '#35e8c0' : '#ff4655';
+    ctx.fillRect(x, 38, (w * clamp(this.health, 0, 100)) / 100, h);
+    this.tagTexture.needsUpdate = true;
+  }
+
+  setWeapon(id) {
+    this.weaponId = id;
+    if (this.weaponModel) {
+      this.weaponMount.remove(this.weaponModel);
+      this.weaponModel.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
+    }
+    const model = buildWeaponModel(id, false);
+    model.rotation.set(0, 0, 0);
+    model.position.set(0, 0, 0);
+    model.scale.setScalar(0.95);
+    this.weaponModel = model;
+    this.muzzle = model.userData.muzzle;
+    this.weaponMount.add(model);
+    // arms hold the gun
+    const w = getWeapon(id);
+    if (w.type === 'MELEE') {
+      this.armR.rotation.set(-0.9, 0, -0.2);
+      this.armL.rotation.set(-0.3, 0, 0.3);
+    } else {
+      this.armR.rotation.set(-1.35, 0, -0.25);
+      this.armL.rotation.set(-1.5, 0.35, 0.42);
+    }
+    this.elbowR.rotation.x = 0.75;
+    this.elbowL.rotation.x = 0.85;
+  }
+
+  /** world-space muzzle position */
+  getMuzzleWorld(target = new THREE.Vector3()) {
+    if (this.muzzle) {
+      this.muzzle.getWorldPosition(target);
+    } else {
+      target.copy(this.pos).add(new THREE.Vector3(0, 1.4, 0));
+    }
+    return target;
+  }
+
+  setPosition(x, y, z) {
+    this.pos.set(x, y, z);
+    this.root.position.copy(this.pos);
+  }
+
+  /** update visuals; called every frame */
+  update(dt, camera, game) {
+    this.root.position.copy(this.pos);
+    this.root.rotation.y = this.yaw;
+
+    if (!this.alive) {
+      this.deathTime += dt;
+      const t = Math.min(1, this.deathTime * 2.2);
+      // fall over backwards
+      this.root.rotation.x = -t * Math.PI * 0.46;
+      this.root.position.y = this.pos.y - t * 0.06;
+      this.tag.visible = false;
+      this.hitFlash = 0;
+      return;
+    }
+
+    const speed = Math.hypot(this.vel.x, this.vel.z);
+    this.walkPhase += dt * (3.2 + speed * 2.2);
+    const swing = Math.min(1, speed / 5.2);
+
+    const crouchTarget = this.crouch > 0 ? 1 : 0;
+    this.upper.position.y = 0.9 - crouchTarget * 0.28 + Math.sin(this.walkPhase * 2) * 0.012 * swing;
+    if (this.crouch > 0) {
+      this.legR.rotation.x = 0.45;
+      this.legL.rotation.x = -0.2;
+      this.root.scale.y = 0.9;
+    } else {
+      this.root.scale.y = 1;
+      this.legR.rotation.x = Math.sin(this.walkPhase) * 0.62 * swing;
+      this.legL.rotation.x = -Math.sin(this.walkPhase) * 0.62 * swing;
+    }
+
+    this.armR.rotation.x = -1.35 + Math.sin(this.walkPhase) * 0.06 * swing;
+    this.armL.rotation.x = -1.5 + Math.sin(this.walkPhase + 1) * 0.06 * swing;
+    // aim pitch
+    this.upper.rotation.x = clamp(-this.pitch * 0.55, -0.55, 0.55);
+
+    // hit flash decay
+    if (this.hitFlash > 0) {
+      this.hitFlash = Math.max(0, this.hitFlash - dt * 4);
+      const k = this.hitFlash;
+      for (const m of this.mats) {
+        if (!m.userData.baseEmissive) m.userData.baseEmissive = m.emissive ? m.emissive.getHex() : 0;
+        if (m.emissive) m.emissive.setRGB(k * 0.9, k * 0.12, k * 0.12);
+      }
+    }
+
+    this._drawTag();
+
+    // tag visibility: allies always within range, enemies when revealed/close
+    let show = false;
+    if (camera) {
+      const dist = camera.position.distanceTo(this.pos);
+      if (this.team === 'ally') show = dist < 45;
+      else show = this.revealed > 0 && dist < 70;
+    }
+    this.tag.visible = show;
+    if (show) {
+      this.tag.position.y = this.crouch > 0 ? 1.95 : 2.15;
+    }
+    if (this.revealed > 0) this.revealed -= dt;
+  }
+
+  /** refresh axis aligned hit boxes for the given world position */
+  updateHitBoxes() {
+    const p = this.pos;
+    const crouch = this.crouch > 0 ? 0.28 : 0;
+    const top = p.y + 1.9 - crouch;
+    this.hitBoxes.head = {
+      min: { x: p.x - 0.19, y: top - 0.34, z: p.z - 0.19 },
+      max: { x: p.x + 0.19, y: top, z: p.z + 0.19 },
+    };
+    this.hitBoxes.body = {
+      min: { x: p.x - 0.32, y: p.y + 0.82, z: p.z - 0.28 },
+      max: { x: p.x + 0.32, y: top - 0.34, z: p.z + 0.28 },
+    };
+    this.hitBoxes.legs = {
+      min: { x: p.x - 0.28, y: p.y, z: p.z - 0.24 },
+      max: { x: p.x + 0.28, y: p.y + 0.82, z: p.z + 0.24 },
+    };
+  }
+
+  dispose() {
+    this.root.parent?.remove(this.root);
+    this.root.traverse((o) => {
+      if (o.isMesh) {
+        if (o.geometry && !Object.values(sharedGeo).includes(o.geometry)) o.geometry.dispose();
+      }
+    });
+    this.tagTexture.dispose();
+  }
+}
+
+/** round-robin roster used to fill 5v5 teams */
+export const BOT_NAMES = {
+  ally: ['Ateş', 'Kılıç', 'Deniz', 'Sarp', 'Yıldız', 'Kaan', 'Mira', 'Ege'],
+  enemy: ['Viper', 'Rook', 'Nyx', 'Krow', 'Jinx', 'Sable', 'Vex', 'Onyx'],
+};

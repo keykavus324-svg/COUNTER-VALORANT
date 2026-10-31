@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#0f1923" />
+<title>COUNTER VALORANT — Tarayıcıda Taktik FPS</title>
+<meta name="description" content="Counter Valorant: tarayıcıda çalışan, Valorant tarzı ajan yetenekleri ve CS tarzı taktik nişancılık içeren ücretsiz FPS." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='%230f1923'/><path d='M14 48 L32 12 L50 48 L32 38 Z' fill='%23ff4655'/></svg>" />
+<link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+<div id="app">
+  <canvas id="game-canvas"></canvas>
+
+  <!-- ============================ IN-GAME HUD ============================ -->
+  <div id="hud" class="hidden">
+    <div id="vignette"></div>
+    <div id="damage-vignette"></div>
+    <div id="flash-overlay"></div>
+    <div id="scope-overlay" class="hidden">
+      <div class="scope-lens">
+        <div class="scope-cross-h"></div>
+        <div class="scope-cross-v"></div>
+        <div class="scope-ring"></div>
+      </div>
+    </div>
+
+    <!-- crosshair -->
+    <div id="crosshair">
+      <i class="ch ch-top"></i><i class="ch ch-bottom"></i><i class="ch ch-left"></i><i class="ch ch-right"></i>
+      <i class="ch-dot"></i>
+      <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+    </div>
+
+    <!-- top bar -->
+    <div id="topbar">
+      <div class="team-score" id="score-ally">0</div>
+      <div id="round-clock">
+        <div id="phase-label">SATIN AL</div>
+        <div id="timer">0:30</div>
+        <div id="round-pips"></div>
+      </div>
+      <div class="team-score enemy" id="score-enemy">0</div>
+    </div>
+
+    <!-- minimap -->
+    <div id="minimap-wrap">
+      <canvas id="minimap" width="240" height="240"></canvas>
+      <div id="map-label">DUNE</div>
+      <div id="spike-mini" class="hidden"></div>
+    </div>
+
+    <!-- killfeed -->
+    <div id="killfeed"></div>
+    <div id="event-feed"></div>
+
+    <!-- left / vitals -->
+    <div id="vitals">
+      <div class="portrait" id="agent-portrait-mini"></div>
+      <div class="bars">
+        <div class="bar hp"><div class="fill" id="hp-fill"></div><span id="hp-text">100</span></div>
+        <div class="bar armor"><div class="fill" id="armor-fill"></div><span id="armor-text">0</span></div>
+      </div>
+      <div class="credits"><span class="c-icon">₡</span><span id="credits">800</span></div>
+    </div>
+
+    <!-- abilities -->
+    <div id="abilities"></div>
+
+    <!-- weapon / ammo -->
+    <div id="ammo-panel">
+      <div id="weapon-name">VANDAL</div>
+      <div id="ammo-numbers"><span id="ammo-mag">25</span><span class="slash">/</span><span id="ammo-reserve">75</span></div>
+      <div id="weapon-slots"></div>
+    </div>
+
+    <!-- center messages -->
+    <div id="round-banner" class="hidden"><div class="rb-inner"><div class="rb-sub"></div><div class="rb-title"></div></div></div>
+    <div id="center-toast"></div>
+    <div id="plant-progress" class="hidden"><div class="pp-ring"></div><span>SPIKE KURULUYOR</span></div>
+    <div id="defuse-progress" class="hidden"><div class="pp-ring"></div><span>SPIKE ÇÖZÜLÜYOR</span></div>
+    <div id="spectate-note" class="hidden"></div>
+    <div id="interact-hint" class="hidden"></div>
+    <div id="kill-banner" class="hidden"></div>
+
+    <!-- scoreboard -->
+    <div id="scoreboard" class="overlay hidden">
+      <div class="sb-inner">
+        <div class="sb-head"><span class="sb-map">DUNE</span><span class="sb-mode">TAKTİK / 5v5 — SPIKE</span><span id="sb-score">0 - 0</span></div>
+        <div class="sb-teams">
+          <div class="sb-team" id="sb-allies"></div>
+          <div class="sb-team enemy" id="sb-enemies"></div>
+        </div>
+        <div class="sb-foot"><span>İLK 5 ROUNDU ALAN KAZANIR</span><span>ATAK / DEFANS</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ BUY MENU ============================ -->
+  <div id="buy-menu" class="overlay hidden">
+    <div class="buy-frame">
+      <header class="buy-head">
+        <div>
+          <div class="eyebrow">SATIN ALMA EVRESİ</div>
+          <h2>SİLAH DOLABI</h2>
+        </div>
+        <div class="buy-money"><span class="c-icon">₡</span><span id="buy-credits">800</span></div>
+        <button class="x-btn" id="buy-close">✕</button>
+      </header>
+      <div class="buy-body">
+        <div class="buy-col">
+          <h3>SİLAHLAR</h3>
+          <div id="buy-weapons" class="buy-grid"></div>
+        </div>
+        <div class="buy-col narrow">
+          <h3>ZIRH &amp; YETENEKLER</h3>
+          <div id="buy-gear" class="buy-list"></div>
+        </div>
+      </div>
+      <footer class="buy-foot">
+        <span>Satın almak için tıkla</span>
+        <span class="kbd-hint"><b>B</b> mağaza · <b>Tab</b> skor · <b>Esc</b> menü</span>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ============================ PAUSE ============================ -->
+  <div id="pause-menu" class="overlay hidden">
+    <div class="modal narrow-m">
+      <div class="eyebrow">MAÇ DURAKLATILDI</div>
+      <h2>DURAKLATILDI</h2>
+      <div class="btn-stack">
+        <button class="btn primary" id="btn-resume">DEVAM ET</button>
+        <button class="btn" id="btn-pause-settings">AYARLAR</button>
+        <button class="btn ghost" id="btn-leave">MAÇTAN AYRIL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ SETTINGS ============================ -->
+  <div id="settings" class="overlay hidden">
+    <div class="modal settings-m">
+      <div class="eyebrow">AYARLAR</div>
+      <h2>OYUN AYARLARI</h2>
+      <div class="settings-grid">
+        <label class="range-row">Fare Hassasiyeti <output id="out-sens">0.45</output>
+          <input type="range" id="set-sens" min="0.05" max="1.5" step="0.01" value="0.45" />
+        </label>
+        <label class="range-row">Görüş Açısı (FOV) <output id="out-fov">90</output>
+          <input type="range" id="set-fov" min="65" max="110" step="1" value="90" />
+        </label>
+        <label class="range-row">Ana Ses <output id="out-vol">0.7</output>
+          <input type="range" id="set-vol" min="0" max="1" step="0.05" value="0.7" />
+        </label>
+        <label class="range-row">Arka Plan Müziği <output id="out-music">0.35</output>
+          <input type="range" id="set-music" min="0" max="1" step="0.05" value="0.35" />
+        </label>
+        <label class="select-row">Grafik Kalitesi
+          <select id="set-quality">
+            <option value="low">Düşük — Hızlı</option>
+            <option value="medium" selected>Orta — Dengeli</option>
+            <option value="high">Yüksek — Gölgeler + Bloom</option>
+          </select>
+        </label>
+        <div class="crosshair-settings">
+          <div class="eyebrow">NİŞAN ALMA İMLECİ</div>
+          <div class="ch-row"><span>Renk</span>
+            <input type="color" id="set-ch-color" value="#5dff9a" />
+            <input type="color" id="set-dot-color" value="#ffffff" />
+          </div>
+          <label class="range-row">Boşluk <output id="out-ch-gap">6</output>
+            <input type="range" id="set-ch-gap" min="0" max="20" step="1" value="6" />
+          </label>
+          <label class="range-row">Uzunluk <output id="out-ch-len">7</output>
+            <input type="range" id="set-ch-len" min="2" max="18" step="1" value="7" />
+          </label>
+          <label class="check-row"><input type="checkbox" id="set-ch-dot" checked /> Nokta göster</label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn primary" id="btn-settings-close">TAMAM</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ MAIN MENU ============================ -->
+  <div id="main-menu" class="screen">
+    <div class="menu-bg">
+      <img src="./art/menu-keyart.jpg" alt="" id="menu-art" />
+      <div class="menu-bg-shade"></div>
+      <div class="menu-scan"></div>
+    </div>
+    <header class="menu-top">
+      <div class="logo-mark"><svg viewBox="0 0 64 64"><path d="M8 52 L32 8 L56 52 L32 40 Z" /></svg></div>
+      <div class="menu-top-right">
+        <span class="server-chip"><i></i> TARAYICI SUNUCUSU · EU</span>
+        <button class="icon-btn" id="btn-menu-settings" title="Ayarlar">⚙</button>
+      </div>
+    </header>
+    <div class="menu-hero">
+      <div class="menu-kicker">TAKTİK FPS · AJAN YETENEKLERİ · TARAYICIDA</div>
+      <h1 class="game-logo">COUNTER<br /><span>VALORANT</span></h1>
+      <p class="menu-sub">Klasik taktik nişancılığın disiplini, ajan yeteneklerinin kaosu.
+        Güçlerini kullan, spike'ı kur, takımını zafere taşı. <b>Kurulum yok — tarayıcıda çalışır.</b></p>
+      <div class="menu-actions">
+        <button class="btn primary big" id="btn-play">
+          <span>OYNA</span><small>5v5 TAKTİK MAÇ</small>
+        </button>
+        <button class="btn big" id="btn-howto">NASIL OYNANIR</button>
+      </div>
+      <div class="menu-stats">
+        <div><b id="stat-agents">4</b><span>AJAN</span></div>
+        <div><b id="stat-weapons">8</b><span>SİLAH</span></div>
+        <div><b>60</b><span>FPS HEDEFİ</span></div>
+        <div><b>0</b><span>KURULUM</span></div>
+      </div>
+    </div>
+    <footer class="menu-foot">
+      <span>Hayran projesi · Riot Games ile bağlantılı değildir · Eğitim amaçlı</span>
+      <span class="menu-foot-links"><button id="btn-howto-foot">KONTROLLER</button><button id="btn-settings-foot">AYARLAR</button></span>
+    </footer>
+    <div class="menu-glow"></div>
+  </div>
+
+  <!-- ============================ AGENT SELECT ============================ -->
+  <div id="agent-select" class="screen hidden">
+    <div class="agent-bg"></div>
+    <header class="as-head">
+      <div class="eyebrow">TAKIMINI SEÇ</div>
+      <h2>AJANINI KİLİTLE</h2>
+      <div class="as-side" id="as-side">TAKIM: <b>SALDIRI</b></div>
+    </header>
+    <div class="as-body">
+      <div class="agent-grid" id="agent-grid"></div>
+      <aside class="agent-detail">
+        <div class="agent-detail-art" id="ad-art"></div>
+        <div class="agent-detail-info">
+          <div class="ad-role" id="ad-role">DUELİST</div>
+          <h3 id="ad-name">BLAZE</h3>
+          <p id="ad-desc"></p>
+          <div class="ad-abilities" id="ad-abilities"></div>
+          <div class="ad-stats">
+            <div><span>HASAR</span><i><b id="ad-stat-dmg" style="width:80%"></b></i></div>
+            <div><span>HAREKET</span><i><b id="ad-stat-mob" style="width:60%"></b></i></div>
+            <div><span>DESTEK</span><i><b id="ad-stat-sup" style="width:40%"></b></i></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <footer class="as-foot">
+      <div class="as-map">HARİTA: <b>DUNE</b> <span>— iki bölge, üç koridor</span></div>
+      <button class="btn primary big" id="btn-lock">AJANI KİLİTLE <small>ve maçı başlat</small></button>
+    </footer>
+  </div>
+
+  <!-- ============================ MATCH END ============================ -->
+  <div id="match-end" class="overlay hidden">
+    <div class="match-end-frame">
+      <div class="eyebrow" id="me-eyebrow">MAÇ SONU</div>
+      <h1 id="me-title">ZAFER</h1>
+      <div class="me-score" id="me-score">5 — 3</div>
+      <div class="me-stats" id="me-stats"></div>
+      <div class="me-actions">
+        <button class="btn primary" id="btn-rematch">TEKRAR OYNA</button>
+        <button class="btn ghost" id="btn-exit">ANA MENÜ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ HOW TO ============================ -->
+  <div id="howto" class="overlay hidden">
+    <div class="modal wide-m">
+      <div class="eyebrow">BRIEFING</div>
+      <h2>NASIL OYNANIR</h2>
+      <div class="howto-cols">
+        <div>
+          <h3>KONTROLLER</h3>
+          <ul class="keys">
+            <li><b>W A S D</b><span>Hareket</span></li>
+            <li><b>Fare</b><span>Nişan al</span></li>
+            <li><b>Sol Tık</b><span>Ateş</span></li>
+            <li><b>Sağ Tık</b><span>Gez/ADS · dürbün</span></li>
+            <li><b>Shift</b><span>Sessiz yürü</span></li>
+            <li><b>Ctrl</b><span>Çömel</span></li>
+            <li><b>Space</b><span>Zıpla</span></li>
+            <li><b>R</b><span>Şarjör değiştir</span></li>
+            <li><b>Q / E / C / X</b><span>Yetenekler</span></li>
+            <li><b>B</b><span>Satın alma menüsü</span></li>
+            <li><b>F</b><span>Spike kur / çöz</span></li>
+            <li><b>Tab</b><span>Skor tablosu</span></li>
+          </ul>
+        </div>
+        <div>
+          <h3>MAÇ KURALLARI</h3>
+          <p><b class="accent">Saldırganlar</b> spike'ı A veya B bölgesine kurar. Kurulum 4 saniye sürer, ardından 45 saniyelik geri sayım başlar.
+            <b class="accent2">Defans</b> spike'ı çözmek için 7 saniye boyunca bölgede kalmalı — yarıda kalırsa süre sıfırlanır.</p>
+          <p>Round'u kazanmanın üç yolu: tüm rakip takımı elemek, spike'ı patlatmak veya spike'ı çözmek. İlk <b>5 roundu</b> alan takım maçı kazanır.</p>
+          <h3>EKONOMİ</h3>
+          <p>Her round başında kredi kazanırsın. Öldürme başına <b>₡200</b>, round kazanma <b>₡3000</b>, kaybetme <b>₡1900</b>, spike kurma <b>₡300</b>. Satın alma evresinde <b>B</b> ile silah, zırh ve yetenek al.</p>
+          <h3>İPUÇLARI</h3>
+          <ul class="tips">
+            <li>Hareket ederken isabet oranı düşer — dur, nişan al, ateş et.</li>
+            <li>Kafadan vuruşlar 4 kat hasar verir. Crosshair'i kafa hizasında tut.</li>
+            <li>Smoke ve duvarlar görüş hattını keser; botlar da göremez.</li>
+            <li>Ölünce takım arkadaşlarını izlersin, round bitince yeniden doğarsın.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="modal-actions"><button class="btn primary" id="btn-howto-close">ANLADIM</button></div>
+    </div>
+  </div>
+
+  <div id="click-to-play" class="hidden">
+    <div class="ctp-inner"><div class="ctp-icon">🖱</div><b>OYUNA DÖNMEK İÇİN TIKLA</b><span>Fare kilidi için tarayıcı izni gerekir</span></div>
+  </div>
+
+  <div id="loading" class="screen">
+    <div class="load-inner">
+      <div class="load-mark"><svg viewBox="0 0 64 64"><path d="M8 52 L32 8 L56 52 L32 40 Z" /></svg></div>
+      <div class="load-title">COUNTER VALORANT</div>
+      <div class="load-bar"><i id="load-fill"></i></div>
+      <div class="load-text" id="load-text">HARİTA DERLENİYOR…</div>
+    </div>
+  </div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
