@@ -131,7 +131,7 @@ export class Actor {
     if (!this.slots[slot] || this.currentSlot === slot || !this.alive) return false;
     this.currentSlot = slot;
     const w = getWeapon(this.slots[slot]);
-    this.character.setWeapon(w.id);
+    this.character.setWeapon(w.id, this.game?.settings?.skins);
     this.syncViewmodel();
     this.equipTimer = Math.min(0.55, 0.24 + (w.type === 'MELEE' ? 0 : 0.1));
     this.reloadTimer = 0;
@@ -152,7 +152,7 @@ export class Actor {
       this.currentSlot = 2;
     }
     this.ammo[id] = { mag: w.mag, reserve: w.reserve };
-    this.character.setWeapon(id);
+    this.character.setWeapon(id, this.game?.settings?.skins);
     this.syncViewmodel();
     this.equipTimer = 0.3;
     this.reloadTimer = 0;

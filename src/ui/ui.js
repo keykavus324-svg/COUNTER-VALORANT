@@ -1,4 +1,7 @@
 import { AGENT_LIST, AGENTS, agentPortraitSVG } from '../game/agents.js';
+import {
+  MAP_ART, WEAPON_SKINS, agentArtUrl, mapArtUrl, skinIconUrl, loadImagePlain, detectCdn,
+} from '../game/valoAssets.js';
 import { BUY_ORDER, WEAPONS, weaponIconSVG } from '../game/weapons.js';
 import { WALLS, PROPS, SITES, SPAWNS, MAP_BOUNDS } from '../world/mapLayout.js';
 import { audio } from '../core/audio.js';
@@ -41,12 +44,17 @@ export class UI {
     this.damageLevel = 0;
     this.blurLevel = 0;
     this.pausedScreen = false;
+    this.vaultWeapon = 'vandal';
+    this.menuSlide = 0;
+    this.menuSlideTimer = null;
+    this.cdn = 'unknown';
 
     this._cacheEls();
     this._initMenus();
     this._initSettings();
     this._initCrosshair();
     this.initMinimap();
+    this._initAuthenticArt();
   }
 
   /* ================================================================ */
@@ -76,6 +84,13 @@ export class UI {
       portraitMini: $('#agent-portrait-mini'),
       meTitle: $('#me-title'), meScore: $('#me-score'), meStats: $('#me-stats'), meEyebrow: $('#me-eyebrow'),
       canvas: $('#game-canvas'),
+      // authentic art
+      menuArt: $('#menu-art'), loadArt: $('#load-art'), adArtImg: $('#ad-art-img'),
+      skinVault: $('#skin-vault'), svWeapons: $('#sv-weapons'), svSkins: $('#sv-skins'),
+      svHint: $('#sv-hint'), vaultStatus: $('#vault-status'),
+      mapsGallery: $('#maps-gallery'), mapsGrid: $('#maps-grid'),
+      btnSkins: $('#btn-skins'), btnMaps: $('#btn-maps'), btnVaultBack: $('#btn-vault-back'),
+      btnVaultNone: $('#btn-vault-none'), btnMapsClose: $('#btn-maps-close'),
     };
     this.mm = this.el.minimap?.getContext('2d');
   }
@@ -88,7 +103,8 @@ export class UI {
   isMenuOpen() {
     return (!this.el.mainMenu.classList.contains('hidden')) ||
       (!this.el.agentSelect.classList.contains('hidden')) ||
-      (!this.el.loading.classList.contains('hidden'));
+      (!this.el.loading.classList.contains('hidden')) ||
+      !!this.el.skinVault && !this.el.skinVault.classList.contains('hidden');
   }
 
   isOverlayOpen() {
@@ -121,6 +137,8 @@ export class UI {
     this.el.pause.classList.add('hidden');
     this.el.buyMenu.classList.add('hidden');
     this.el.scoreboard.classList.add('hidden');
+    this.el.skinVault?.classList.add('hidden');
+    this.el.mapsGallery?.classList.add('hidden');
     document.body.classList.remove('playing');
     this.setMenuStats();
     if (this.stats) {
@@ -201,8 +219,8 @@ export class UI {
       const card = document.createElement('button');
       card.className = 'agent-card' + (agent.id === this.selectedAgent ? ' selected' : '');
       card.innerHTML = `
-        <img src="${agentPortraitSVG(agent.id, { name: false })}" alt="${agent.name}" />
-        <div class="ac-shade"></div>
+        ${this.agentArtHTML(agent.id)}
+        <div class="ac-scrim"></div>
         <div class="ac-key">0${i + 1}</div>
         <div class="ac-check">✓</div>
         <div class="ac-role">${agent.role}</div>
@@ -223,7 +241,10 @@ export class UI {
   showAgentDetail(agentId) {
     const agent = AGENTS[agentId];
     if (!agent) return;
-    this.el.adArt.innerHTML = `<img src="${agentPortraitSVG(agentId, { name: false })}" alt="${agent.name}" />`;
+    const artUrl = agentArtUrl(this.artKey(agentId), 'fullportrait');
+    this.el.adArt.innerHTML = artUrl
+      ? `<img src="${artUrl}" alt="${agent.name}" onerror="this.style.display='none'" />`
+      : agentPortraitSVG(agentId, { name: false });
     this.el.adRole.textContent = agent.role;
     this.el.adName.textContent = agent.name;
     this.el.adDesc.textContent = agent.desc;
@@ -371,6 +392,7 @@ export class UI {
     document.body.classList.add('playing');
     this.el.hud.classList.remove('hidden');
     this.el.portraitMini.style.backgroundImage = `url("${agentPortraitSVG(this.selectedAgent, { name: false })}")`;
+    this.setHudPortrait(this.selectedAgent);
     this.resetHUD();
     this.onStartMatch?.(this.selectedAgent, this.settings);
   }
@@ -903,13 +925,14 @@ export class UI {
       const owned = p.slots[1] === w.id || p.slots[2] === w.id;
       const can = data.credits >= w.price;
       return `<button class="buy-item keybind ${owned ? 'owned' : ''} ${!can && !owned ? 'cant' : ''}" data-weapon="${w.id}" data-key="${i + 1}">
-        <div class="bi-icon">${weaponIconSVG(w.id)}</div>
+        <div class="bi-icon">${this.buyWeaponArt(w.id)}</div>
         <div class="bi-name">${w.name}</div>
         <div class="bi-type">${w.type}</div>
         ${owned ? '<div class="bi-own">SAHİPSİN</div>' : `<div class="bi-price">₡${w.price}</div>`}
       </button>`;
     }).join('');
 
+    this._bindWeaponArtFallbacks(this.el.buyWeapons);
     this.el.buyWeapons.querySelectorAll('[data-weapon]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.weapon;
@@ -1000,6 +1023,230 @@ export class UI {
     this.showHUD(false);
     document.body.classList.remove('playing');
     audio.play(data.win ? 'win' : 'lose', { volume: 1 });
+  }
+
+  /* ================================================================ */
+  /* AUTHENTIC VALORANT ART                                            */
+  /* ================================================================ */
+  _initAuthenticArt() {
+    this.agentArtKeys = { blaze: 'phoenix', veil: 'omen', pulse: 'sova', oath: 'sage' };
+
+    // buttons
+    this.el.btnSkins?.addEventListener('click', () => { audio.play('ui_click'); this.showSkinVault(true); });
+    this.el.btnMaps?.addEventListener('click', () => { audio.play('ui_click'); this.showMapsGallery(true); });
+    this.el.btnVaultBack?.addEventListener('click', () => { audio.play('ui_click'); this.showSkinVault(false); });
+    this.el.btnMapsClose?.addEventListener('click', () => { audio.play('ui_click'); this.showMapsGallery(false); });
+    this.el.btnVaultNone?.addEventListener('click', () => {
+      audio.play('ui_click');
+      if (!this.settings.skins) this.settings.skins = {};
+      this.settings.skins[this.vaultWeapon] = 'none';
+      this.save();
+      this.renderVaultSkins(this.vaultWeapon);
+    });
+
+    // is the CDN reachable? (offline → procedural art stays, cards show a warning)
+    detectCdn().then((state) => {
+      this.cdn = state;
+      if (this.el.vaultStatus) {
+        this.el.vaultStatus.textContent = state === 'online'
+          ? 'orijinal kaplamalar · valorant-api'
+          : 'çevrimdışı — kaplama görselleri yüklenemedi';
+        this.el.vaultStatus.classList.toggle('online', state === 'online');
+        this.el.vaultStatus.classList.toggle('offline', state !== 'online');
+      }
+      this._buildWeaponArt();
+      this.renderMaps();
+      if (state === 'online') this._startMenuSlideshow();
+    });
+
+    this.renderVaultWeapons();
+    this.renderVaultSkins(this.vaultWeapon);
+    this._buildWeaponArt();
+    this._pickHeroArt();
+  }
+
+  /** the mapping between our original agents and the art we display */
+  artKey(agentId) {
+    return AGENTS[agentId]?.artKey || this.agentArtKeys?.[agentId] || agentId;
+  }
+
+  /** real portrait <img> for an agent card / detail panel */
+  agentArtHTML(agentId, cls = 'ac-art') {
+    const url = agentArtUrl(this.artKey(agentId), 'fullportrait');
+    if (!url) return agentPortraitSVG(agentId, { name: false });
+    return `<img class="${cls}" src="${url}" alt="" loading="lazy"
+      onerror="this.style.display='none'" />`;
+  }
+
+  /** weapon skin render (falls back to the procedural SVG icon) */
+  weaponArtURL(weaponId) {
+    const skinMap = this.settings.skins || {};
+    const listed = WEAPON_SKINS[weaponId] || [];
+    if (!listed.length) return null;
+    const chosen = listed.find((s) => s.uuid === skinMap[weaponId]) || listed[0];
+    return skinIconUrl(chosen.uuid);
+  }
+
+  _buildWeaponArt() {
+    // swapped by renderBuy() at runtime, kept here so the buy menu can use it
+    this._weaponArt = {};
+    for (const id of Object.keys(WEAPON_SKINS)) this._weaponArt[id] = this.weaponArtURL(id);
+  }
+
+  /* ---------------- hero / slideshow art ---------------- */
+  _pickHeroArt() {
+    const maps = MAP_ART.filter((m) => m.uuid);
+    const pick = maps[Math.floor(Math.random() * maps.length)] || MAP_ART[0];
+    this.setHeroArt(pick, { credits: true });
+  }
+
+  setHeroArt(map, { credits = false } = {}) {
+    const url = mapArtUrl(map.uuid, 'splash');
+    if (this.el.menuArt) {
+      this.el.menuArt.classList.add('swap');
+      loadImagePlain(url).then((img) => {
+        if (img) this.el.menuArt.src = url;
+        this.el.menuArt.classList.remove('swap');
+      });
+    }
+    if (this.el.loadArt) {
+      loadImagePlain(url).then((img) => { if (img && this.el.loadArt) this.el.loadArt.src = url; });
+    }
+    if (credits && !this._artCredit && this.el.mainMenu) {
+      const tag = document.createElement('div');
+      tag.className = 'menu-art-credit';
+      tag.textContent = `${map.name} — VALORANT HARİTASI`;
+      this.el.mainMenu.appendChild(tag);
+      this._artCredit = tag;
+    } else if (this._artCredit) {
+      this._artCredit.textContent = `${map.name} — VALORANT HARİTASI`;
+    }
+  }
+
+  _startMenuSlideshow() {
+    clearInterval(this.menuSlideTimer);
+    const maps = MAP_ART.filter((m) => m.uuid);
+    if (!maps.length) return;
+    this.menuSlideTimer = setInterval(() => {
+      if (!this.el.mainMenu || this.el.mainMenu.classList.contains('hidden')) return;
+      this.menuSlide = (this.menuSlide + 1) % maps.length;
+      this.setHeroArt(maps[this.menuSlide], { credits: true });
+    }, 9000);
+  }
+
+  /* ---------------- skin vault ---------------- */
+  showSkinVault(open) {
+    this.el.skinVault.classList.toggle('hidden', !open);
+    if (open) {
+      this.renderVaultWeapons();
+      this.renderVaultSkins(this.vaultWeapon);
+    }
+    if (open) this.el.mainMenu.classList.add('hidden');
+    else this.el.mainMenu.classList.remove('hidden');
+  }
+
+  renderVaultWeapons() {
+    if (!this.el.svWeapons) return;
+    const order = ['vandal', 'phantom', 'operator', 'sheriff', 'ghost', 'spectre', 'judge', 'bulldog', 'odin', 'classic'];
+    this.el.svWeapons.innerHTML = order.map((id) => {
+      const count = (WEAPON_SKINS[id] || []).length;
+      return `<button class="vault-wpn ${id === this.vaultWeapon ? 'active' : ''}" data-wpn="${id}">
+        <span>${id.toUpperCase()}</span><small>${count}</small>
+      </button>`;
+    }).join('');
+    this.el.svWeapons.querySelectorAll('[data-wpn]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        audio.play('ui_click');
+        this.vaultWeapon = btn.dataset.wpn;
+        this.renderVaultWeapons();
+        this.renderVaultSkins(this.vaultWeapon);
+      });
+    });
+  }
+
+  renderVaultSkins(weaponId) {
+    if (!this.el.svSkins) return;
+    const skins = WEAPON_SKINS[weaponId] || [];
+    const equipped = (this.settings.skins || {})[weaponId];
+    const activeUuid = equipped === 'none' ? null : (equipped || skins[0]?.uuid);
+    this.el.svSkins.innerHTML = skins.map((skin) => {
+      const isOn = skin.uuid === activeUuid;
+      return `<button class="skin-card ${isOn ? 'equipped' : ''}" data-skin="${skin.uuid}">
+        <div class="skin-badge">KUŞANILDI</div>
+        <div class="skin-art"><span class="skin-fallback">🔫</span></div>
+        <div class="skin-name">${skin.name.toUpperCase()}<small>${weaponId.toUpperCase()} · VALORANT</small></div>
+      </button>`;
+    }).join('');
+
+    // fill in the real renders asynchronously, keeping the placeholder on failure
+    this.el.svSkins.querySelectorAll('.skin-card').forEach((card) => {
+      const uuid = card.dataset.skin;
+      const slot = card.querySelector('.skin-art');
+      loadImagePlain(skinIconUrl(uuid)).then((img) => {
+        if (!img || !slot.isConnected) return;
+        slot.innerHTML = `<img src="${img.src}" alt="" />`;
+      });
+      card.addEventListener('click', () => {
+        audio.play('ui_click');
+        if (!this.settings.skins) this.settings.skins = {};
+        this.settings.skins[weaponId] = uuid;
+        this.save();
+        if (this.el.svHint) {
+          const skin = skins.find((s) => s.uuid === uuid);
+          this.el.svHint.textContent = `${skin?.name || 'Kaplama'} kuşanıldı — maçta ${weaponId.toUpperCase()} aldığında uygulanır.`;
+        }
+        this.renderVaultSkins(weaponId);
+        this._buildWeaponArt();
+      });
+    });
+  }
+
+  /* ---------------- map gallery ---------------- */
+  showMapsGallery(open) {
+    this.el.mapsGallery.classList.toggle('hidden', !open);
+    if (open) this.renderMaps();
+  }
+
+  renderMaps() {
+    if (!this.el.mapsGrid) return;
+    this.el.mapsGrid.innerHTML = MAP_ART.map((m) => `
+      <div class="map-card">
+        <div class="map-fallback">${m.name}</div>
+        <img data-map="${m.uuid}" alt="${m.name}" style="opacity:0" />
+        <div class="map-tag">${m.name}<small>${m.desc}</small></div>
+      </div>`).join('');
+    this.el.mapsGrid.querySelectorAll('img[data-map]').forEach((img) => {
+      loadImagePlain(mapArtUrl(img.dataset.map, 'list')).then((res) => {
+        if (!res || !img.isConnected) return;
+        img.src = res.src;
+        img.style.opacity = '1';
+      });
+    });
+  }
+
+  /** buy menu thumbnail: real Valorant render, SVG fallback if the CDN is down */
+  buyWeaponArt(weaponId) {
+    const url = this.weaponArtURL(weaponId);
+    if (!url) return weaponIconSVG(weaponId);
+    return `<img src="${url}" alt="" data-fallback="${weaponId}" loading="lazy" />`;
+  }
+
+  /** wire the SVG fallback onto every buy-menu render that failed to load */
+  _bindWeaponArtFallbacks(root) {
+    root?.querySelectorAll('img[data-fallback]').forEach((img) => {
+      img.addEventListener('error', () => {
+        const id = img.dataset.fallback;
+        const holder = img.parentElement;
+        if (holder) holder.innerHTML = weaponIconSVG(id);
+      }, { once: true });
+    });
+  }
+
+  /** HUD portrait: the agent's real bust instead of the placeholder block */
+  setHudPortrait(agentId) {
+    if (!this.el.portraitMini) return;
+    const url = agentArtUrl(this.artKey(agentId), 'bust') || agentArtUrl(this.artKey(agentId), 'icon');
+    this.el.portraitMini.innerHTML = url ? `<img src="${url}" alt="" onerror="this.remove()" />` : '';
   }
 }
 

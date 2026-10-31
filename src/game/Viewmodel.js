@@ -57,6 +57,7 @@ export class Viewmodel {
     this.weaponId = null;
     this.agentId = 'blaze';
     this._weaponModels = new Map();
+    this.skinMap = null;
 
     this.setAgent('blaze');
   }
@@ -112,11 +113,21 @@ export class Viewmodel {
     }
   }
 
+  /** re-apply weapon skins (called when the player changes skin in the vault) */
+  setSkinMap(skinMap) {
+    this.skinMap = skinMap || null;
+    if (this.weaponId) {
+      const id = this.weaponId;
+      this.weaponId = null;
+      this.setWeapon(id);
+    }
+  }
+
   setWeapon(id) {
     if (this.weaponId === id) return;
     this.weaponId = id;
     this.weaponHolder.clear();
-    const model = buildWeaponModel(id, true);
+    const model = buildWeaponModel(id, true, this.skinMap);
     model.position.set(0, 0, 0);
     // scale long guns down a touch so they fit the frame
     const w = getWeapon(id);

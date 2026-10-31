@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { decorateWeaponModel } from './skins.js';
 
 /**
  * Weapon catalogue + procedural low-poly weapon models.
@@ -129,7 +130,7 @@ function cyl(rt, rb, h, mat, x = 0, y = 0, z = 0, rx = Math.PI / 2, seg = 12) {
  * Builds a weapon. Model faces -Z (muzzle direction), origin at the grip.
  * viewmodel=true uses slightly exaggerated proportions for the first person view.
  */
-export function buildWeaponModel(id, viewmodel = true) {
+export function buildWeaponModel(id, viewmodel = true, skinMap = null) {
   const g = new THREE.Group();
   const w = getWeapon(id);
   const muzzle = new THREE.Object3D();
@@ -329,6 +330,7 @@ export function buildWeaponModel(id, viewmodel = true) {
       }
     });
   }
+  if (skinMap !== undefined) decorateWeaponModel(g, id, skinMap);
   return g;
 }
 

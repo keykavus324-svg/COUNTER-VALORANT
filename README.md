@@ -71,10 +71,14 @@ değiştirilebilir. Ayarlar `localStorage`'da saklanır.
 
 | Ajan | Rol | Yetenekler (Q / E / C / X) |
 | --- | --- | --- |
-| **BLAZE** | Duelist | Ateş Perdesi · Sıçrama · Kor Ateşi · Cehennem |
-| **VEIL** | Kontrolcü | Duman Perdesi · Perde · Sezgi · Kara Perde |
-| **PULSE** | Başlatıcı | Nabız Atışı · Şok Dalgası · Sersemletme · Nabız Dalgası |
-| **OATH** | Nöbetçi | Onarım · Kalkan · Hendek · Kutsal Alan |
+| **PHOENIX** | Duelist | Blaze · Curveball · Hot Hands · Run It Back |
+| **OMEN** | Kontrolcü | Dark Cover · Paranoia · Shrouded Step · From the Shadows |
+| **SOVA** | Başlatıcı | Recon Bolt · Shock Bolt · Owl Drone · Hunter's Fury |
+| **SAGE** | Nöbetçi | Healing Orb · Barrier Orb · Slow Orb · Resurrection |
+
+Ajan portreleri, silah skinleri ve harita görselleri **valorant-api** açık veri
+setinden çalışma anında yüklenir (ayrıntı: `ASSETS.md`). Ağ yoksa oyun yerleşik
+procedural görsellerle ve skine özel renk paletleriyle çalışmaya devam eder.
 
 Takım arkadaşları KARTAL, DENİZ, MİRA, SARP; rakip takım VIPER, ROOK, NYX, KROW, SABLE.
 Botlar rota bazlı saldırı kolları kullanır (A/B main, conn, mid), spike taşır, kurar,
@@ -96,6 +100,25 @@ Botlar rota bazlı saldırı kolları kullanır (A/B main, conn, mid), spike ta�
 | Odin | Minigun | 3200₡ |
 
 Her silahın kendine özgü tepme (recoil), yayılma, hareket cezası ve kafa çarpanı vardır.
+
+### 73 orijinal skin
+
+Ana menüdeki **SKIN KOLEKSİYONU** ekranından 10 silah için toplam 73 orijinal
+Valorant kaplaması seçilebilir (Prime, Reaver, Elderflame, Glitchpop, Oni,
+Spectrum, Gaia's Vengeance, Magepunk, RGX 11z Pro, Champions …).
+Seçim kaydedilir ve maçta o silahı aldığında:
+
+* kaplamanın **gerçek render'ı** silah modelinin iki yanına giydirilir
+  (birinci şahıs modeli, botların silahları ve satın alma menüsü ikonları),
+* aynı skine ait **renk paleti** gövde malzemesine uygulanır (metalik/pürüzlü ayarıyla),
+* görsel indirilemezse yalnızca palet uygulanır — oyun çalışmaya devam eder.
+
+### Harita galerisi
+
+Ana menüdeki **HARİTALAR** ekranında 11 Valorant haritasının (Ascent, Bind, Haven,
+Split, Icebox, Lotus, Sunset, Pearl, Breeze, Fracture, Abyss) resmi görseli ve
+kısa tanıtımı yer alır. Ana menü ve yükleme ekranının arka planı da gerçek harita
+görselleriyle döner.
 
 ## Harita — DUNE
 

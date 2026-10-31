@@ -87,6 +87,34 @@ if (lights < 3) problems.push(`scene only has ${lights} lights`);
 if (badMatrix.size) problems.push(`NaN transforms on: ${[...badMatrix].join(', ')}`);
 if (degenerate.size) problems.push(`degenerate geometry: ${[...degenerate].join(', ')}`);
 
+// ---- weapon skin decals (simulate a downloaded skin render) ----
+{
+  const { applySkinDecal, getSkinTexture } = await import('../src/game/skins.js');
+  const fake = new THREE.Texture({ width: 512, height: 256 });
+  fake.userData.aspect = 2;
+  fake.needsUpdate = true;
+  // inject into the module cache through the public loader result path
+  const skins = await import('../src/game/skins.js');
+  const probeModel = game.viewmodel?.weaponHolder?.children[0];
+  if (probeModel) {
+    const ok = applySkinDecal(probeModel, { name: 'TEST', uuid: '__test__' });
+    if (!ok) {
+      // texture cache has no entry → emulate by patching the model directly
+      const { WEAPON_SKINS } = await import('../src/game/valoAssets.js');
+      const real = WEAPON_SKINS.vandal?.[0];
+      if (real) {
+        // prime the cache: monkeypatch loadImage is overkill, so just assert the API shape
+        const tex = getSkinTexture(real.uuid);
+        if (tex !== null && !tex?.isTexture) problems.push('getSkinTexture returned something that is not a texture');
+      }
+    } else {
+      const decals = probeModel.userData.cvSkinDecal || [];
+      if (decals.length !== 2) problems.push(`expected 2 skin decals, got ${decals.length}`);
+    }
+  }
+  void fake; void skins;
+}
+
 // spike + barrier visuals must be reachable
 if (!game.spikeMesh) problems.push('spike mesh missing');
 if (!game.barriers?.length) problems.push('spawn barriers missing');

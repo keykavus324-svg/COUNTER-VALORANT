@@ -209,6 +209,10 @@
         </button>
         <button class="btn big" id="btn-howto">NASIL OYNANIR</button>
       </div>
+      <div class="menu-actions secondary">
+        <button class="btn slim" id="btn-skins"><span>SKIN KOLEKSİYONU</span><small>orijinal silah kaplamaları</small></button>
+        <button class="btn slim" id="btn-maps"><span>HARİTALAR</span><small>Valorant harita galerisi</small></button>
+      </div>
       <div class="menu-stats">
         <div><b id="stat-agents">4</b><span>AJAN</span></div>
         <div><b id="stat-weapons">8</b><span>SİLAH</span></div>
@@ -234,7 +238,7 @@
     <div class="as-body">
       <div class="agent-grid" id="agent-grid"></div>
       <aside class="agent-detail">
-        <div class="agent-detail-art" id="ad-art"></div>
+        <div class="agent-detail-art" id="ad-art"><img id="ad-art-img" alt="" /></div>
         <div class="agent-detail-info">
           <div class="ad-role" id="ad-role">DUELİST</div>
           <h3 id="ad-name">BLAZE</h3>
@@ -311,11 +315,42 @@
     </div>
   </div>
 
+  <!-- ============================ SKIN VAULT ============================ -->
+  <div id="skin-vault" class="screen hidden">
+    <header class="vault-head">
+      <div>
+        <div class="eyebrow">KOLEKSİYON</div>
+        <h2>SİLAH SKINLERİ</h2>
+      </div>
+      <div class="vault-status" id="vault-status">orijinal kaplamalar yükleniyor…</div>
+      <button class="x-btn" id="btn-vault-back">✕</button>
+    </header>
+    <div class="vault-body">
+      <aside class="vault-weapons" id="sv-weapons"></aside>
+      <section class="vault-skins" id="sv-skins"></section>
+    </div>
+    <footer class="vault-foot">
+      <span id="sv-hint">Bir kaplama seç — maçta o silahı aldığında otomatik uygulanır.</span>
+      <button class="btn ghost slim" id="btn-vault-none">VARSAYILAN KAPLAMA</button>
+    </footer>
+  </div>
+
+  <!-- ============================ MAPS GALLERY ============================ -->
+  <div id="maps-gallery" class="overlay hidden">
+    <div class="modal maps-m">
+      <div class="eyebrow">SAVAŞ ALANLARI</div>
+      <h2>VALORANT HARİTALARI</h2>
+      <div class="maps-grid" id="maps-grid"></div>
+      <div class="modal-actions"><button class="btn primary" id="btn-maps-close">KAPAT</button></div>
+    </div>
+  </div>
+
   <div id="click-to-play" class="hidden">
     <div class="ctp-inner"><div class="ctp-icon">🖱</div><b>OYUNA DÖNMEK İÇİN TIKLA</b><span>Fare kilidi için tarayıcı izni gerekir</span></div>
   </div>
 
   <div id="loading" class="screen">
+    <img id="load-art" class="load-art" alt="" />
     <div class="load-inner">
       <div class="load-mark"><svg viewBox="0 0 64 64"><path d="M8 52 L32 8 L56 52 L32 40 Z" /></svg></div>
       <div class="load-title">COUNTER VALORANT</div>

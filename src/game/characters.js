@@ -260,13 +260,14 @@ export class Character {
     this.tagTexture.needsUpdate = true;
   }
 
-  setWeapon(id) {
+  setWeapon(id, skinMap = null) {
     this.weaponId = id;
+    this.skinMap = skinMap;
     if (this.weaponModel) {
       this.weaponMount.remove(this.weaponModel);
       this.weaponModel.traverse((o) => { if (o.isMesh) o.geometry.dispose(); });
     }
-    const model = buildWeaponModel(id, false);
+    const model = buildWeaponModel(id, false, skinMap);
     model.rotation.set(0, 0, 0);
     model.position.set(0, 0, 0);
     model.scale.setScalar(0.95);

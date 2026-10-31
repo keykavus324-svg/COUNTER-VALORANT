@@ -8,6 +8,7 @@ import {
   siteDecalTexture, skyTexture, glowTexture,
 } from './Textures.js';
 import { boxFromCenter, segmentBox2D, pointInBox } from '../core/utils.js';
+import { getArtTexture, agentArtUrl, whenArtReady } from '../game/skins.js';
 
 const _rayDir = new THREE.Vector3();
 
@@ -78,6 +79,7 @@ export class GameMap {
     this._buildProps();
     this._buildDetails();
     this._buildNav();
+    this._buildAgentPosters();
 
     this.bounds = MAP_BOUNDS;
     this.sites = SITES;
@@ -646,6 +648,59 @@ export class GameMap {
     }
     matCache.clear();
   }
+  /* ---------------------------------------------------------------- */
+  /**
+   * Wall posters with the real Valorant agent renders. They pop in only once the
+   * artwork has actually downloaded; offline the walls simply stay clean.
+   */
+  _buildAgentPosters() {
+    const keys = ['phoenix', 'omen', 'sova', 'sage'];
+    const spots = [
+      // attacker yard: perimeter wall behind the spawn, facing the players
+      { x: 0, z: 32.85, ry: Math.PI, w: 3.4, h: 4.6 },
+      { x: -12, z: 32.85, ry: Math.PI, w: 2.6, h: 3.6 },
+      { x: 12, z: 32.85, ry: Math.PI, w: 2.6, h: 3.6 },
+      // defender spawn room, on the back wall
+      { x: 0, z: -32.85, ry: 0, w: 3.2, h: 4.4 },
+      // A / B site entrance walls, facing the spike sites
+      { x: 21, z: -12.72, ry: Math.PI, w: 2.4, h: 3.4 },
+      { x: -21, z: -12.72, ry: Math.PI, w: 2.4, h: 3.4 },
+    ];
+    const urls = keys.map((k) => agentArtUrl(k, 'fullportrait'));
+    const groups = [];
+    spots.forEach((spot, i) => {
+      const key = keys[i % keys.length];
+      const url = agentArtUrl(key, 'fullportrait');
+      const g = new THREE.Group();
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(spot.w + 0.16, spot.h + 0.16, 0.1),
+        new THREE.MeshStandardMaterial({ color: 0x1c2530, roughness: 0.8, metalness: 0.35 })
+      );
+      const art = new THREE.Mesh(
+        new THREE.PlaneGeometry(spot.w, spot.h),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, toneMapped: false })
+      );
+      art.position.z = 0.07;
+      g.add(frame, art);
+      g.position.set(spot.x, spot.h / 2 + 0.6, spot.z);
+      g.rotation.y = spot.ry;
+      this.group.add(g);
+      groups.push({ art, url });
+    });
+
+    const paint = () => {
+      for (const { art, url } of groups) {
+        const tex = getArtTexture(url);
+        if (!tex || art.material.map === tex) continue;
+        art.material.map = tex;
+        art.material.opacity = 0.92;
+        art.material.needsUpdate = true;
+      }
+    };
+    paint();
+    whenArtReady(urls, paint);
+  }
+
 }
 
 /* slab test returning distance + normal */

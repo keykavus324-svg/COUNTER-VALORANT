@@ -6,32 +6,33 @@
 export const AGENTS = {
   blaze: {
     id: 'blaze',
-    name: 'BLAZE',
-    realName: 'Kaya Ateş',
+    name: 'PHOENIX',
+    realName: 'Phoenix',
     role: 'DUELİST',
     country: 'TR',
     tagline: 'Ateşle oynama.',
+    artKey: 'phoenix',
     colors: { primary: '#ff5a3c', secondary: '#ffc14a', dark: '#3a1710', fabric: '#c0442c' },
     desc: 'Saldırının önündeki isim. Alevle koridor açar, hızla girer ve çıkar. Yakın dövüşte rakibine nefes aldırmaz.',
     stats: { dmg: 92, mob: 78, sup: 34 },
     abilities: [
       {
-        id: 'firewall', key: 'Q', name: 'ATEŞ PERDESİ', icon: '🔥', price: 250, charges: 1,
+        id: 'firewall', key: 'Q', name: 'BLAZE', icon: '🔥', price: 250, charges: 1,
         desc: 'Baktığın noktaya yanan bir alan fırlatır. İçindeki düşmanlar yanar ve yavaşlar.',
         cast: 'projectile', cooldown: 0,
       },
       {
-        id: 'dash', key: 'E', name: 'SIÇRAMA', icon: '💨', price: 0, charges: 1,
+        id: 'dash', key: 'E', name: 'CURVEBALL', icon: '💨', price: 0, charges: 1,
         desc: 'Baktığın yöne doğru hızla atıl. Kısa süreliğine hızın artar.',
         cast: 'dash', cooldown: 22,
       },
       {
-        id: 'flash', key: 'C', name: 'KOR ATEŞİ', icon: '✨', price: 150, charges: 1,
+        id: 'flash', key: 'C', name: 'HOT HANDS', icon: '✨', price: 150, charges: 1,
         desc: 'Kör edici bir parlama fırlatır. Bakış açısı parlamaya yakınsa rakip kör olur.',
         cast: 'projectile', cooldown: 0, flash: true,
       },
       {
-        id: 'inferno', key: 'X', name: 'CEHENNEM', icon: '☄️', price: 0, charges: 1, ultCost: 6,
+        id: 'inferno', key: 'X', name: 'RUN IT BACK', icon: '☄️', price: 0, charges: 1, ultCost: 6,
         desc: 'ULTİMATE — Etrafında dev bir ateş patlaması yaratır. Yakındaki tüm düşmanlar ağır hasar alır.',
         cast: 'self', cooldown: 0, ultimate: true,
       },
@@ -41,32 +42,33 @@ export const AGENTS = {
 
   veil: {
     id: 'veil',
-    name: 'VEIL',
-    realName: 'Nora Şen',
+    name: 'OMEN',
+    realName: 'Omen',
     role: 'KONTROLCÜ',
     country: 'TR',
     tagline: 'Görmediğin şey seni öldürür.',
+    artKey: 'omen',
     colors: { primary: '#4aa8ff', secondary: '#8f6bff', dark: '#101b33', fabric: '#2f4f7d' },
     desc: 'Görüş hattını yönetir. Dumanları ve duvarıyla düşmanın nişan açısını yok eder, takımına güvenli geçiş açar.',
     stats: { dmg: 52, mob: 55, sup: 94 },
     abilities: [
       {
-        id: 'smoke', key: 'Q', name: 'DUMAN PERDESİ', icon: '🌫️', price: 200, charges: 2,
+        id: 'smoke', key: 'Q', name: 'DARK COVER', icon: '🌫️', price: 200, charges: 2,
         desc: 'Baktığın noktaya kalın bir duman bulutu bırakır. İçinden kimse göremez.',
         cast: 'projectile', cooldown: 0,
       },
       {
-        id: 'veilwall', key: 'E', name: 'PERDE', icon: '🧱', price: 0, charges: 1,
+        id: 'veilwall', key: 'E', name: 'PARANOIA', icon: '🧱', price: 0, charges: 1,
         desc: 'Önüne görüş kesen bir enerji duvarı kurar. Mermileri de durdurur.',
         cast: 'wall', cooldown: 28,
       },
       {
-        id: 'recon', key: 'C', name: 'SEZGİ', icon: '📡', price: 150, charges: 1,
+        id: 'recon', key: 'C', name: 'SHROUDED STEP', icon: '📡', price: 150, charges: 1,
         desc: 'Kısa menzilli bir tarama atar; yakındaki düşmanları kısa süre işaretler.',
         cast: 'self', cooldown: 18,
       },
       {
-        id: 'blackout', key: 'X', name: 'KARA PERDE', icon: '🌑', price: 0, charges: 1, ultCost: 6,
+        id: 'blackout', key: 'X', name: 'FROM THE SHADOWS', icon: '🌑', price: 0, charges: 1, ultCost: 6,
         desc: 'ULTİMATE — Haritanın büyük bir kısmını kaplayan dev duman duvarı. Düşmanın gözü kapanır.',
         cast: 'projectile', cooldown: 0, ultimate: true,
       },
@@ -76,32 +78,33 @@ export const AGENTS = {
 
   pulse: {
     id: 'pulse',
-    name: 'PULSE',
-    realName: 'Deniz Yalçın',
+    name: 'SOVA',
+    realName: 'Sova',
     role: 'BAŞLATICI',
     country: 'TR',
     tagline: 'Nabzını duyuyorum.',
+    artKey: 'sova',
     colors: { primary: '#30f3c8', secondary: '#5ad1ff', dark: '#0c2a28', fabric: '#20695e' },
     desc: 'Bilgi toplar ve bozar. Radar atışı ile düşmanın yerini açar, şok dalgası ile savunmayı kırar.',
     stats: { dmg: 66, mob: 62, sup: 80 },
     abilities: [
       {
-        id: 'radar', key: 'Q', name: 'NABIZ ATIŞI', icon: '📶', price: 200, charges: 2,
+        id: 'radar', key: 'Q', name: 'RECON BOLT', icon: '📶', price: 200, charges: 2,
         desc: 'Baktığın yöne radar dalgası yollar. Menzildeki düşmanlar 5 saniye duvarların ardından görünür.',
         cast: 'projectile', cooldown: 0,
       },
       {
-        id: 'shock', key: 'E', name: 'ŞOK DALGASI', icon: '⚡', price: 0, charges: 1,
+        id: 'shock', key: 'E', name: 'SHOCK BOLT', icon: '⚡', price: 0, charges: 1,
         desc: 'Baktığın noktada patlar. Alandaki düşmanlar hasar alır ve ağırlaşır.',
         cast: 'projectile', cooldown: 15,
       },
       {
-        id: 'stun', key: 'C', name: 'SERSEMLETME', icon: '🌀', price: 150, charges: 1,
+        id: 'stun', key: 'C', name: 'OWL DRONE', icon: '🌀', price: 150, charges: 1,
         desc: 'Yakın alandaki düşmanları sersemletir; nişan almaları zorlaşır.',
         cast: 'self', cooldown: 20,
       },
       {
-        id: 'emp', key: 'X', name: 'NABIZ DALGASI', icon: '💥', price: 0, charges: 1, ultCost: 6,
+        id: 'emp', key: 'X', name: "HUNTER'S FURY", icon: '💥', price: 0, charges: 1, ultCost: 6,
         desc: 'ULTİMATE — Tüm düşmanları işaretler ve yakındakileri ağır yavaşlatır.',
         cast: 'self', cooldown: 0, ultimate: true,
       },
@@ -111,32 +114,33 @@ export const AGENTS = {
 
   oath: {
     id: 'oath',
-    name: 'OATH',
-    realName: 'Ece Demir',
+    name: 'SAGE',
+    realName: 'Sage',
     role: 'NÖBETÇİ',
     country: 'TR',
     tagline: 'Kimse geride kalmaz.',
+    artKey: 'sage',
     colors: { primary: '#f5c86b', secondary: '#ffe9b0', dark: '#241c0c', fabric: '#8a6a34' },
     desc: 'Takımı ayakta tutar. Onarım ve kalkan yetenekleriyle round\'u çevirir, kritik anda kutsal alan açar.',
     stats: { dmg: 44, mob: 50, sup: 100 },
     abilities: [
       {
-        id: 'heal', key: 'Q', name: 'ONARIM', icon: '💚', price: 200, charges: 2,
+        id: 'heal', key: 'Q', name: 'HEALING ORB', icon: '💚', price: 200, charges: 2,
         desc: 'Kendini veya nişan aldığın takım arkadaşını iyileştirir.',
         cast: 'heal', cooldown: 0,
       },
       {
-        id: 'shield', key: 'E', name: 'KALKAN', icon: '🛡️', price: 0, charges: 1,
+        id: 'shield', key: 'E', name: 'BARRIER ORB', icon: '🛡️', price: 0, charges: 1,
         desc: 'Kendine 50 geçici kalkan verir. Kalkan kırılmadan hasar almazsın.',
         cast: 'self', cooldown: 24,
       },
       {
-        id: 'barrier', key: 'C', name: 'HENDek', icon: '🧱', price: 150, charges: 1,
+        id: 'barrier', key: 'C', name: 'SLOW ORB', icon: '🧱', price: 150, charges: 1,
         desc: 'Önüne kısa bir siper duvarı kurar. Mermileri durdurur.',
         cast: 'wall', cooldown: 26,
       },
       {
-        id: 'sanctuary', key: 'X', name: 'KUTSAL ALAN', icon: '🌟', price: 0, charges: 1, ultCost: 6,
+        id: 'sanctuary', key: 'X', name: 'RESURRECTION', icon: '🌟', price: 0, charges: 1, ultCost: 6,
         desc: 'ULTİMATE — Alandaki tüm takım arkadaşlarını tamamen iyileştirir ve kalkan verir.',
         cast: 'self', cooldown: 0, ultimate: true,
       },

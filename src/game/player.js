@@ -42,7 +42,7 @@ export class Player extends Actor {
     this.crouch = false;
     this.currentSlot = this.slots[1] ? 1 : 2;
     this.character.root.visible = false;
-    this.character.setWeapon(this.slots[this.currentSlot] || 'classic');
+    this.character.setWeapon(this.slots[this.currentSlot] || 'classic', this.game?.settings?.skins);
     this.equipTimer = 0.4;
     this.syncViewmodel?.();
     this.dead = false;

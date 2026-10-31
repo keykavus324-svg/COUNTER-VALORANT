@@ -13,6 +13,7 @@ globalThis.document = window.document;
 globalThis.HTMLElement = window.HTMLElement;
 globalThis.HTMLCanvasElement = window.HTMLCanvasElement;
 globalThis.localStorage = window.localStorage;
+globalThis.Image = window.Image;
 globalThis.requestAnimationFrame = window.requestAnimationFrame?.bind(window) || ((cb) => setTimeout(() => cb(performance.now()), 16));
 globalThis.cancelAnimationFrame = window.cancelAnimationFrame?.bind(window) || clearTimeout;
 window.matchMedia = window.matchMedia || (() => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }));
@@ -131,6 +132,21 @@ trap('matchEnd', () => ui.showMatchEnd({ win: true, allyScore: 5, enemyScore: 2,
 trap('matchEnd close', () => ui.showMatchEnd(null));
 trap('settings save/load', () => { ui.save(); ui.load(); ui.applySettingsToGame(); });
 trap('startMatch', () => ui.startMatch());
+trap('skin vault', () => {
+  ui.showSkinVault(true);
+  for (const id of ['vandal', 'phantom', 'operator', 'sheriff', 'classic']) {
+    ui.vaultWeapon = id;
+    ui.renderVaultWeapons();
+    ui.renderVaultSkins(id);
+  }
+  // click the first skin card to make sure equipping + re-render works
+  const card = document.querySelector('#sv-skins .skin-card');
+  card?.click();
+  ui.showSkinVault(false);
+});
+trap('maps gallery', () => { ui.showMapsGallery(true); ui.showMapsGallery(false); });
+trap('agent art', () => { ui.agentArtHTML('blaze'); ui.setHudPortrait('blaze'); ui.weaponArtURL('vandal'); });
+trap('hero art', () => { ui.setHeroArt({ uuid: 'x', name: 'ASCENT' }, { credits: true }); });
 trap('showMenu again', () => { ui.showMenu(); ui.showAgentSelect(); });
 
 // duplicate ids / missing referenced nodes

@@ -133,6 +133,7 @@ export class Game {
     this.scene.add(this.player.character.root);
     this.player.character.root.visible = false;
     this.viewmodel.setAgent(this.agentId);
+    this.viewmodel.setSkinMap(this.settings.skins || null);
 
     // bot team roster
     const usedAgents = [this.agentId];
@@ -173,26 +174,50 @@ export class Game {
   }
 
   _buildSpikeVisual() {
+    // Valorant-style spike: dark plated housing, three folding prongs and a
+    // glowing core that pulses faster as the timer runs down.
     const g = new THREE.Group();
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(0.42, 0.5, 0.3),
-      new THREE.MeshStandardMaterial({ color: 0x2a3138, metalness: 0.7, roughness: 0.4 })
+    const shellMat = new THREE.MeshStandardMaterial({ color: 0x1d2329, metalness: 0.85, roughness: 0.34 });
+    const plateMat = new THREE.MeshStandardMaterial({ color: 0x39424b, metalness: 0.7, roughness: 0.45 });
+    const glowMat = new THREE.MeshStandardMaterial({
+      color: 0xffe9a8, emissive: 0xffb43c, emissiveIntensity: 2.6, roughness: 0.25, metalness: 0.2,
+    });
+    this.spikeGlowMat = glowMat;
+
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.09, 6), shellMat);
+    base.position.y = 0.05;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.22, 0.42, 6), plateMat);
+    body.position.y = 0.3;
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.022, 6, 14), shellMat);
+    collar.rotation.x = Math.PI / 2;
+    collar.position.y = 0.5;
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.3, 8), glowMat);
+    core.position.y = 0.66;
+
+    // three prongs folding over the core
+    const prongs = new THREE.Group();
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2 + Math.PI / 6;
+      const prong = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.34, 0.05), plateMat);
+      prong.position.set(Math.cos(a) * 0.16, 0.72, Math.sin(a) * 0.16);
+      prong.rotation.z = -Math.cos(a) * 0.35;
+      prong.rotation.x = Math.sin(a) * 0.35;
+      prongs.add(prong);
+    }
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 6), glowMat);
+    tip.position.y = 0.92;
+
+    const light = new THREE.PointLight(0xffb43c, 2.4, 9, 2);
+    light.position.y = 0.7;
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.3, 0.014, 5, 20),
+      new THREE.MeshBasicMaterial({ color: 0xffc46a, transparent: true, opacity: 0.72, blending: THREE.AdditiveBlending, depthWrite: false })
     );
-    body.position.y = 0.25;
-    const core = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.1, 0.34, 8),
-      new THREE.MeshStandardMaterial({ color: 0xff4655, emissive: 0xff2233, emissiveIntensity: 2.2, roughness: 0.3 })
-    );
-    core.position.y = 0.55;
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(0.22, 0.03, 6, 18),
-      new THREE.MeshStandardMaterial({ color: 0xd8dee3, metalness: 0.9, roughness: 0.25 })
-    );
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0.05;
-    const light = new THREE.PointLight(0xff3344, 2.4, 8, 2);
-    light.position.y = 0.6;
-    g.add(body, core, ring, light);
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = 0.02;
+    this.spikeHalo = halo;
+
+    g.add(base, body, collar, core, prongs, tip, light, halo);
     g.visible = false;
     this.scene.add(g);
     this.spikeMesh = g;
@@ -559,7 +584,7 @@ export class Game {
 
     // reset actor inventories that were lost? weapons persist like Valorant
     this.player.currentSlot = this.player.slots[1] ? 1 : 2;
-    this.player.character.setWeapon(this.player.slots[this.player.currentSlot]);
+    this.player.character.setWeapon(this.player.slots[this.player.currentSlot], this.settings.skins);
     this.player.syncViewmodel();
     this.player.equipTimer = 0.3;
     this.player.credits = Math.max(this.player.credits, 0);
@@ -1499,6 +1524,15 @@ export class Game {
         this.spikeCore.scale.setScalar(s);
       }
       this.spikeLight.intensity = 1.6 + Math.sin(this.time * 8) * 1.2;
+      if (this.spikeHalo) {
+        const u = clamp(1 - this.phaseTimer / SPIKE_TIME, 0, 1);
+        this.spikeHalo.scale.setScalar(1 + Math.sin(this.time * (3 + u * 9)) * 0.12 + u * 0.22);
+        this.spikeHalo.material.opacity = 0.45 + u * 0.45;
+      }
+      if (this.spikeGlowMat) {
+        const u = clamp(1 - this.phaseTimer / SPIKE_TIME, 0, 1);
+        this.spikeGlowMat.emissiveIntensity = 1.8 + u * 3.4;
+      }
       if (this.phaseTimer <= 0) this.explodeSpike();
     } else if (this.phase === 'roundEnd') {
       this.phaseTimer -= dt;
